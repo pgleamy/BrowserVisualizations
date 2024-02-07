@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>3D Solar System Simulation</title>
+    <style>
+        body { margin: 0; }
+        canvas { width: 100%; height: 100%; display: block; }
+    </style>
+</head>
+<body>
+<script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+
+    // Patrick G. Leamy, Feb/1/2024
+    // X.com @pgleamy
+    
+
+
+    let scene, camera, renderer, controls;
+    const celestialBodies = [];
+    const earthOrbitalSpeed = 0.0005; // Base speed for Earth's orbit
+
+function init() {
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
+    camera.position.set(-200, 300, 400);
+
+    // Enable anti-aliasing
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    // Enable shadows in the renderer
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Optional: for softer shadows
+    document.body.appendChild(renderer.domElement);
+
+    // Ambient light doesn't cast shadows
+    const ambientLight = new THREE.HemisphereLight(0xaaaaaa, 0.2);
+    scene.add(ambientLight);
+
+    // Configure sunlight to cast shadows
+    const sunlight = new THREE.PointLight(0xfffaaa, 1.8, 800);
+    sunlight.position.set(0, 0, 0);
+    sunlight.castShadow = true;
+    // Optional: Fine-tune shadow properties for performance and appearance
+    sunlight.shadow.mapSize.width = 20480; // Default is 512
+    sunlight.shadow.mapSize.height = 20480; // Default is 512
+
+    sunlight.shadow.camera.near = 0.00000000001; // Default is 0.5
+    sunlight.shadow.camera.far = 500; // Default is 500
+    sunlight.shadow.camera.left = -500;
+    sunlight.shadow.camera.right = 500;
+    sunlight.shadow.camera.top = 500;
+    sunlight.shadow.camera.bottom = -500;
+
+    scene.add(sunlight);
+
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+// Sun
+addCelestialBody(0, 0, 33, '#FFFF00', 0, 0); // Bright yellow for the Sun
+
+// Planets in correct order from the Sun, with up to 2 moons each, and accurate relative orbital velocities
+const mercury = addCelestialBody(100, 0, 6, '#B2A29F', 58, 3.4 * earthOrbitalSpeed); // Mercury, grayish-brown
+const venus = addCelestialBody(150, 0, 11, '#E1C699', 108, 1.62 * earthOrbitalSpeed); // Venus, pale yellow
+const earth = addCelestialBody(200, 0, 13, '#1C75BC', 150, 1 * earthOrbitalSpeed); // Earth, blue with greenish tint for land
+addMoon(earth, 20, 1.3, '#C0C0C0', 22, -0.003); // Earth's Moon, gray
+const mars = addCelestialBody(250, 0, 9, '#CC6633', 180, 0.6 * earthOrbitalSpeed); // Mars, reddish-brown
+addMoon(mars, 22, 1.3, '#888888', 36, 0.0015); // Mars's Moon Phobos, dark gray
+addMoon(mars, 24, 1.1, '#787878', 30, 0.0025); // Mars's Moon Deimos, slightly lighter gray
+const jupiter = addCelestialBody(400, 0, 21, '#C8A55D', 250, 0.33 * earthOrbitalSpeed); // Jupiter, pale orange with bands
+addMoon(jupiter, 30, 1.2, '#E6E6E6', 39, 0.002); // Jupiter's Moon Ganymede, light gray
+addMoon(jupiter, 33, 1.5, '#D3D3D3', 47, -0.0015); // Jupiter's Moon Callisto, slightly darker gray
+const saturn = addCelestialBody(550, 0, 17, '#EFCB6E', 320, 0.23 * earthOrbitalSpeed); // Saturn, pale gold
+// Add rings to Saturn
+addRingsToPlanet(saturn, 22, 40, '#A5A5A5', 0.4); // Example values for the inner radius, outer radius, and color
+addMoon(saturn, 36, 1.7, '#F5F3E5', 36, -0.001); // Saturn's Moon Titan, cream
+addMoon(saturn, 38, 1.4, '#F4F4F4', 40, 0.0015); // Saturn's Moon Rhea, very light gray
+const uranus = addCelestialBody(700, 0, 14, '#66CCFF', 370, 0.15 * earthOrbitalSpeed); // Uranus, cyan
+addMoon(uranus, 28, 1.5, '#D9D9D9', 39, -0.002); // Uranus's Moon Titania, medium gray
+addMoon(uranus, 30, 1.3, '#D0D0D0', 31, -0.0025); // Uranus's Moon Oberon, slightly lighter medium gray
+const neptune = addCelestialBody(850, 0, 15, '#4970A3', 420, 0.07 * earthOrbitalSpeed); // Neptune, deep blue
+addMoon(neptune, 29, 1.2, '#B0C4DE', 34, 0.0018); // Neptune's Moon Triton, light steel blue
+addMoon(neptune, 31, 1.4, '#ADD8E6', 37, 0.001); // Neptune's Moon Proteus, light blue
+
+// Pluto (dwarf planet)
+const pluto = addCelestialBody(900, 0, 5, '#BEB7A4', 450, 0.04 * earthOrbitalSpeed); // Pluto, pale brown
+addMoon(pluto, 6, 1.1, '#D3D3D3', 22, -0.001); // Pluto's Moon Charon, light gray
+
+        window.addEventListener('resize', onWindowResize, false);
+    }
+
+    function addCelestialBody(x, y, radius, color, orbitRadius, speed) {
+        const geometry = new THREE.SphereGeometry(radius, 32, 32);
+        const material = new THREE.MeshLambertMaterial({ color: color });
+        const sphere = new THREE.Mesh(geometry, material);
+        sphere.position.set(x, y, 0);
+        sphere.castShadow = true; // Enable casting shadows
+        sphere.receiveShadow = true; // Enable receiving shadows
+        scene.add(sphere);
+
+        const body = { sphere, orbitRadius, speed, angle: 0, moons: [] };
+        celestialBodies.push(body);
+        return body;
+    }
+
+    function addMoon(planet, distance, radius, color, orbitRadius, speed) {
+        const moonGeometry = new THREE.SphereGeometry(radius, 32, 32);
+        const moonMaterial = new THREE.MeshLambertMaterial({ color: color });
+        const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+        planet.sphere.add(moon);
+        moon.castShadow = true; // Enable casting shadows
+        moon.receiveShadow = true; // Enable receiving shadows
+        moon.position.set(distance, 0, 0);
+
+        const moonData = { sphere: moon, orbitRadius, speed, angle: 0 };
+        planet.moons.push(moonData);
+    }
+
+    function addRingsToPlanet(planet, innerRadius, outerRadius, color, opacity) {
+        const geometry = new THREE.RingGeometry(innerRadius, outerRadius, 64);
+        const material = new THREE.MeshBasicMaterial({
+            color: color,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: opacity
+        });
+        const ring = new THREE.Mesh(geometry, material);
+        ring.rotation.x = Math.PI / 2; // Rotate the ring to lie flat
+        planet.sphere.add(ring);
+    }
+
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+
+        celestialBodies.forEach(body => {
+            if (body.orbitRadius > 0) {
+                body.angle += body.speed;
+                const x = Math.cos(body.angle) * body.orbitRadius;
+                const z = Math.sin(body.angle) * body.orbitRadius;
+                body.sphere.position.set(x, 0, z);
+            }
+
+            body.moons.forEach(moon => {
+                moon.angle += moon.speed;
+                const x = Math.cos(moon.angle) * moon.orbitRadius;
+                const z = Math.sin(moon.angle) * moon.orbitRadius;
+                moon.sphere.position.set(x, 0, z);
+            });
+        });
+
+        controls.update();
+
+        renderer.setPixelRatio(window.devicePixelRatio);
+
+        renderer.render(scene, camera);
+    }
+
+    init();
+    animate();
+</script>
+</body>
+</html>

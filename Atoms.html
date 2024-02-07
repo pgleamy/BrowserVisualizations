@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>3D Point Cloud</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <script>
+    const canvas = document.querySelector('#canvas');
+    const ctx = canvas.getContext('2d');
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const points = [];
+    const pointSize = 1.5;
+    const pointColor = 'white';
+    const backgroundColor = 'black';
+
+    let dragging = false;
+    let prevX = 0;
+    let prevY = 0;
+    let rotationX = 0;
+    let rotationY = 0;
+
+    function createPoints() {
+      const cubeSize = 400;
+      const step = cubeSize / 14;
+
+      for (let x = -cubeSize / 2; x <= cubeSize / 2; x += step) {
+        for (let y = -cubeSize / 2; y <= cubeSize / 2; y += step) {
+          for (let z = -cubeSize / 2; z <= cubeSize / 2; z += step) {
+            points.push({ x, y, z });
+          }
+        }
+      }
+    }
+
+    function draw() {
+      ctx.fillStyle = backgroundColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.fillStyle = pointColor;
+      points.forEach((mainPoint, index) => {
+        // Create a random offset for the satellite
+        const offsetFactor = 0.3;
+        const offset = {
+          x: Math.random() * 50 * offsetFactor - 25 * offsetFactor,
+          y: Math.random() * 50 * offsetFactor - 25 * offsetFactor,
+          z: Math.random() * 50 * offsetFactor - 25 * offsetFactor
+        };
+
+        // Calculate the satellite position based on the main point and the offset
+        const satellitePosition = {
+          x: mainPoint.x + offset.x,
+          y: mainPoint.y + offset.y,
+          z: mainPoint.z + offset.z
+        };
+
+        // Apply wobble effect to the main point
+        const wobbledMainPoint = wobble(mainPoint);
+
+        // Rotate the main point and the satellite around the origin
+        const rotatedMainPoint = rotatePoint(wobbledMainPoint, rotationX, rotationY);
+        const rotatedSatellite = rotatePoint(satellitePosition, rotationX, rotationY);
+
+        // Translate the main point and the satellite to the center of the canvas
+        const translatedMainPoint = {
+          x: rotatedMainPoint.x + canvas.width / 2,
+          y: rotatedMainPoint.y + canvas.height / 2
+        };
+        const translatedSatellite = {
+          x: rotatedSatellite.x + canvas.width / 2,
+          y: rotatedSatellite.y + canvas.height / 2
+        };
+
+        // Draw the main point
+        ctx.beginPath();
+        ctx.arc(translatedMainPoint.x, translatedMainPoint.y, pointSize, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw the satellite
+        ctx.beginPath();
+        ctx.arc(translatedSatellite.x, translatedSatellite.y, pointSize * 0.65, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    function rotatePoint(point, rotationX, rotationY) {
+      const { x, y, z } = point;
+
+      // Rotate around the X axis
+      const rotatedX = x;
+      const rotatedY = y * Math.cos(rotationX) - z * Math.sin(rotationX);
+      const rotatedZ = y * Math.sin(rotationX) + z * Math.cos(rotationX);
+
+      // Rotate around the Y axis
+      const rotatedX2 = rotatedX * Math.cos(rotationY) + rotatedZ * Math.sin(rotationY);
+      const rotatedY2 = rotatedY;
+      const rotatedZ2 = -rotatedX * Math.sin(rotationY) + rotatedZ * Math.cos(rotationY);
+
+      return { x: rotatedX2, y: rotatedY2, z: rotatedZ2 };
+    }
+
+    function wobble(point) {
+      const wobbleX = Math.random() * 2 - 1;
+      const wobbleY = Math.random() * 2 - 1;
+      const wobbleZ = Math.random() * 2 - 1;
+
+      return {
+        x: point.x + wobbleX,
+        y: point.y + wobbleY,
+        z: point.z + wobbleZ
+      };
+    }
+
+    function handleMouseDown(e) {
+      dragging = true;
+      prevX = e.clientX;
+      prevY = e.clientY;
+    }
+
+    function handleMouseMove(e) {
+      if (dragging) {
+        const deltaX = e.clientX - prevX;
+        const deltaY = e.clientY - prevY;
+
+        // Update the rotationX and rotationY variables
+        const rotationSpeedX = 0.01;
+        const rotationSpeedY = 0.005;
+        rotationX += deltaY * rotationSpeedX;
+        rotationY += deltaX * rotationSpeedY;
+
+        prevX = e.clientX;
+        prevY = e.clientY;
+      }
+    }
+
+    function handleMouseUp() {
+      dragging = false;
+    }
+
+    createPoints();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      draw();
+    }
+
+    canvas.addEventListener('mousedown', handleMouseDown);
+    canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('mouseup', handleMouseUp);
+    canvas.addEventListener('touchstart', handleMouseDown);
+    canvas.addEventListener('touchmove', handleMouseMove);
+    canvas.addEventListener('touchend', handleMouseUp);
+
+    animate();
+  </script>
+</body>
+</html>
