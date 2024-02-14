@@ -3,7 +3,5 @@ A collection of JavaScript artistic visualizations that I've made. Each is conta
 
 I have a bunch of these I've made, but most are not that great. So I'll just add the interesting ones here from time to time.
 
-I created this repository because X.com breaks my code when I post it by forcefully reformatting some lines of the code to hyperlinks. There is no way I can find to stop this forced formatting. I needed a way to share these reliably so people aren't frustrated when they try to run them and it doesn't work (because X.com broke my code!).
-
 https://github.com/pgleamy/BrowserVisualizations/blob/main/SolarSystem3dimensional.html
 
