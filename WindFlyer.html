@@ -50,7 +50,7 @@
         let playerPosition = { x: canvas.width / 9, y: canvas.height / 2 };
         let obstacles = [];
         const minimumWindStrength = 3;
-        const maximumWindStrength = 6;
+        const maximumWindStrength = 6.2;
         let windStrength = minimumWindStrength;
         let score = 0;
         let highScore = localStorage.getItem('highScore') ? parseInt(localStorage.getItem('highScore')) : 0;
@@ -137,8 +137,8 @@
 
         function gameLoop() {
 
-            if (upPressed) playerPosition.y -= 1.45; // Adjust for smoother or faster movement
-            if (downPressed) playerPosition.y += 1.45;
+            if (upPressed) playerPosition.y -= 1.5; // Adjust for smoother or faster movement
+            if (downPressed) playerPosition.y += 1.5;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             drawPlayer();
