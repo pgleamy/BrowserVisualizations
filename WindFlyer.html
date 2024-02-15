@@ -53,7 +53,8 @@
         const maximumWindStrength = 6.4;
         let windStrength = minimumWindStrength;
         let score = 0;
-        let highScore = localStorage.getItem('highScore') ? parseInt(localStorage.getItem('highScore')) : 0;
+	let highScoreKey = 'windFlyerHighScore';
+        let highScore = localStorage.getItem('highScoreKey') ? parseInt(localStorage.getItem('highScoreKey')) : 0;
         let gameRunning = true;
 
         document.getElementById('highScore').innerText = highScore;
@@ -130,7 +131,7 @@
             document.getElementById('currentScore').innerText = score;
             if (score > highScore) {
                 highScore = score;
-                localStorage.setItem('highScore', highScore);
+                localStorage.setItem('highScoreKey', highScore);
                 document.getElementById('highScore').innerText = highScore;
             }
         }
