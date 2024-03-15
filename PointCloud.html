@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>3D Point Cloud Continuous Wiggle with Vanilla JS and Canvas</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: black; }
+        canvas { display: block; background: black; }
+    </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    let scale = 700;
+    let points = generatePoints(1600, scale);
+    let angleX = 0;
+    let angleY = 0;
+
+    let lastMouseX = 0;
+    let lastMouseY = 0;
+    let isDragging = false;
+
+    // Initial canvas size update
+    updateCanvasSize();
+
+    // Generate points
+    function generatePoints(n, scale) {
+        let points = [];
+        for (let i = 0; i < n; i++) {
+            points.push({
+                x: (Math.random() * 2 - 1) * scale,
+                y: (Math.random() * 2 - 1) * scale,
+                z: (Math.random() * 2 - 1) * scale
+            });
+        }
+        return points;
+    }
+
+    // Rotate point
+    function rotatePoint(point, angleX, angleY) {
+        let cosY = Math.cos(angleY);
+        let sinY = Math.sin(angleY);
+        let x = point.x * cosY - point.z * sinY;
+        let z = point.z * cosY + point.x * sinY;
+
+        let cosX = Math.cos(angleX);
+        let sinX = Math.sin(angleX);
+        let y = point.y * cosX - z * sinX;
+        z = z * cosX + point.y * sinX;
+
+        return { x, y, z };
+    }
+
+    // Project point
+    function project(point) {
+        const fov = 500;
+        const perspective = fov / (fov + point.z);
+        return {
+            x: point.x * perspective + canvas.width / 2,
+            y: point.y * perspective + canvas.height / 2,
+            scale: perspective
+        };
+    }
+
+    // Draw point with details
+    function drawPointWithDetails(x, y, scale) {
+	    // Skip drawing if the calculated scale (and thus radius) is negative
+        if (scale <= 0) return;
+
+        // Main point
+        ctx.beginPath();
+        ctx.arc(x, y, scale * 2.2, 0, 2 * Math.PI);
+        ctx.fillStyle = 'green';
+        ctx.fill();
+
+        // Smaller surrounding points to create a more complex visual
+        const detailScale = scale * 0.4; // Scale for the smaller points
+        for (let angle = 0; angle < 2 * Math.PI; angle += Math.PI / 4) {
+            const detailX = x + Math.cos(angle) * 5 * scale;
+            const detailY = y + Math.sin(angle) * 5 * scale;
+            ctx.beginPath();
+            ctx.arc(detailX, detailY, detailScale, 0, 2 * Math.PI);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.fill();
+        }
+    }
+
+    // Draw function
+    function draw(time) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        points.forEach((originalPoint, index) => {
+            // Continuous wiggle effect based on time and index
+            const wiggleScale = 20;
+            const wiggleX = Math.sin(time * 0.0004 + index) * wiggleScale;
+            const wiggleY = Math.cos(time * 0.0005 + index) * wiggleScale;
+            const wiggleZ = Math.sin(time * 0.0006 + index) * wiggleScale;
+
+            const wiggledPoint = {
+                x: originalPoint.x + wiggleX,
+                y: originalPoint.y + wiggleY,
+                z: originalPoint.z + wiggleZ
+            };
+
+            const rotatedPoint = rotatePoint(wiggledPoint, angleX, angleY);
+            const {x, y, scale} = project(rotatedPoint);
+            drawPointWithDetails(x, y, scale);
+        });
+
+        requestAnimationFrame(draw);
+    }
+
+    // Event listeners for mouse interaction
+    canvas.addEventListener('mousedown', function(e) {
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+        isDragging = true;
+    });
+
+    window.addEventListener('mouseup', function() {
+        isDragging = false;
+    });
+
+    canvas.addEventListener('mousemove', function(e) {
+        if (isDragging) {
+            const deltaX = e.clientX - lastMouseX;
+            const deltaY = e.clientY - lastMouseY;
+            angleY += deltaX * 0.001;
+            angleX += deltaY * 0.001;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY; 
+        }
+    });
+
+    // Update canvas size on window resize
+    function updateCanvasSize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+
+    // Listen for window resize to update canvas size
+    window.addEventListener('resize', updateCanvasSize);
+
+    requestAnimationFrame(draw);
+</script>
+</body>
+</html>
