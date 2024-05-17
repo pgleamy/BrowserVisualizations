@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ASTEROIDS Version A clone by Patrick G. Leamy</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: black; }
+        canvas { display: block; background: black; }
+        #startScreen {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+            font-size: 24px;
+        }
+        #startButton {
+            padding: 10px 20px;
+            font-size: 24px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="startScreen">
+        <div>ASTEROIDS</div>
+        <div>---------</div>
+        <div>-----</div>
+        <div>---</div>
+        <div>-</div>
+        <button id="startButton">PLAY</button>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script src="ASTEROIDS.min.js"></script>
+
+</body>
+</html>
