@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Meditation Tone Generator with Harmonics</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f2f2f7;
+            color: #000;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        label {
+            font-size: 17px;
+            margin-right: 10px;
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="range"] {
+            width: 80%;
+            margin: 10px 0;
+            -webkit-appearance: none;
+            background: #0a84ff;
+            height: 2px;
+            border-radius: 2px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 28px;
+            height: 28px;
+            background: #fff;
+            border: 1px solid #0a84ff;
+            border-radius: 14px;
+            cursor: pointer;
+        }
+        span {
+            font-size: 17px;
+        }
+        button {
+            margin: 10px 0;
+            padding: 10px 20px;
+            font-size: 17px;
+            border: none;
+            background-color: #0a84ff;
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        button:active {
+            background-color: #007aff;
+        }
+        .button-description {
+            font-size: 14px;
+            color: #6d6d72;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Meditation Tone Generator with Harmonics</h1>
+    <label for="frequency">Main Frequency (Hz):</label>
+    <input type="range" id="frequency" min="110" max="777" value="528" step="1">
+    <span id="frequencyValue">528</span>
+
+    <label for="harmonicOffsetHigh">High Harmonic Offset (%):</label>
+    <input type="range" id="harmonicOffsetHigh" min="0" max="5" value="0.5" step="0.1">
+    <span id="harmonicOffsetHighValue">0.5</span>
+
+    <label for="harmonicOffsetLow">Low Harmonic Offset (%):</label>
+    <input type="range" id="harmonicOffsetLow" min="0" max="5" value="0.5" step="0.1">
+    <span id="harmonicOffsetLowValue">0.5</span>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+        <button id="play">Play Tone</button>
+        <div class="button-description">Starts the meditation tone with harmonics</div>
+        <button id="stop">Stop Tone</button>
+        <div class="button-description">Halts the current tone</div>
+    </div>
+
+    <script>
+        const context = new (window.AudioContext || window.webkitAudioContext)();
+        let oscillators = [];
+
+        const frequencySlider = document.getElementById('frequency');
+        const frequencyValue = document.getElementById('frequencyValue');
+        const harmonicOffsetHigh = document.getElementById('harmonicOffsetHigh');
+        const harmonicOffsetHighValue = document.getElementById('harmonicOffsetHighValue');
+        const harmonicOffsetLow = document.getElementById('harmonicOffsetLow');
+        const harmonicOffsetLowValue = document.getElementById('harmonicOffsetLowValue');
+        const playButton = document.getElementById('play');
+        const stopButton = document.getElementById('stop');
+
+        frequencySlider.addEventListener('input', function() {
+            frequencyValue.textContent = this.value;
+        });
+
+        harmonicOffsetHigh.addEventListener('input', function() {
+            harmonicOffsetHighValue.textContent = this.value;
+        });
+
+        harmonicOffsetLow.addEventListener('input', function() {
+            harmonicOffsetLowValue.textContent = this.value;
+        });
+
+        playButton.addEventListener('click', function() {
+            oscillators.forEach(osc => osc.stop());
+            oscillators = [];
+
+            const mainFreq = parseInt(frequencySlider.value);
+            const highOffset = parseFloat(harmonicOffsetHigh.value) / 100;
+            const lowOffset = parseFloat(harmonicOffsetLow.value) / 100;
+
+            // Main tone
+            const mainOsc = context.createOscillator();
+            mainOsc.type = 'sine';
+            mainOsc.frequency.setValueAtTime(mainFreq, context.currentTime);
+            mainOsc.connect(context.destination);
+            oscillators.push(mainOsc);
+
+            // Harmonics
+            const offsets = [
+                { type: 'high', offset: highOffset },
+                { type: 'low', offset: -lowOffset },
+                { type: 'high', offset: highOffset * 2 } // Second high harmonic
+            ];
+
+            offsets.forEach(offset => {
+                const harmonicOsc = context.createOscillator();
+                harmonicOsc.type = 'sine'; // You might experiment with different waveforms here
+                harmonicOsc.frequency.setValueAtTime(mainFreq * (1 + offset.offset), context.currentTime);
+                harmonicOsc.connect(context.destination);
+                oscillators.push(harmonicOsc);
+            });
+
+            oscillators.forEach(osc => osc.start());
+        });
+
+        stopButton.addEventListener('click', function() {
+            oscillators.forEach(osc => {
+                if (osc) {
+                    osc.stop();
+                }
+            });
+            oscillators = [];
+        });
+    </script>
+</body>
+</html>
