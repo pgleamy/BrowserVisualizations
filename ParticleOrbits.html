@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expanded Cosmic Dust</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: black;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="cosmicDust"></canvas>
+    <script>
+        const canvas = document.getElementById('cosmicDust');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const particles = [];
+        const colors = ['#ff4136', '#0074d9', '#2ecc40', '#ffdc00', '#b10dc9'];
+
+        function Particle(x, y, radius, color) {
+            this.x = x;
+            this.y = y;
+            this.radius = radius;
+            this.color = color;
+            this.radians = Math.random() * Math.PI * 2;
+            this.baseVelocity = Math.random() * 0.015 + 0.005; // Slower base speed for center particles
+            this.direction = Math.random() > 0.5 ? 1 : -1;
+            this.distanceFromCenter = Math.sqrt(Math.random()) * canvas.width * 1.1 / 2; // 10% wider than the width, unchanged
+            this.centerX = x;
+            this.centerY = y;
+
+            this.update = function() {
+                const lastPoint = { x: this.x, y: this.y };
+                let speedModifier = 1 - (this.distanceFromCenter / (canvas.width * 1.1 / 2));
+                let currentVelocity = this.baseVelocity * speedModifier;
+                
+                this.radians += currentVelocity * this.direction;
+                this.x = this.centerX + Math.cos(this.radians) * this.distanceFromCenter;
+                this.y = this.centerY + Math.sin(this.radians) * this.distanceFromCenter;
+                this.draw(lastPoint);
+            };
+
+            this.draw = function(lastPoint) {
+                ctx.beginPath();
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = this.radius;
+                ctx.moveTo(lastPoint.x, lastPoint.y);
+                ctx.lineTo(this.x, this.y);
+                ctx.stroke();
+                ctx.closePath();
+            };
+        }
+
+        function init() {
+            particles.length = 0; // Clear existing particles
+            const baseParticleCount = Math.floor((canvas.width * canvas.height) / 20000); // Original density
+            const particleCount = baseParticleCount * 36; // Tripled from 12 times, now 36 times original
+            for (let i = 0; i < particleCount; i++) {
+                const radius = Math.random() * 2 + 1;
+                particles.push(new Particle(
+                    canvas.width / 2,
+                    canvas.height / 2,
+                    radius,
+                    colors[Math.floor(Math.random() * colors.length)]
+                ));
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            particles.forEach(particle => {
+                particle.update();
+            });
+        }
+
+        init();
+        animate();
+    </script>
+</body>
+</html>

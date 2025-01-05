@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chasing Nebula Tails with Particles</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="flowingFields"></canvas>
+    <script>
+        const canvas = document.getElementById('flowingFields');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        // Resize canvas on window resize
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        // Particle class for visualization
+        class Particle {
+            constructor(x, y, speed, direction, color) {
+                this.x = x;
+                this.y = y;
+                this.speed = speed;
+                this.direction = direction;
+                this.color = color;
+                this.lifetime = 0;
+                this.size = Math.random() * 2 + 1;
+            }
+
+            update() {
+                this.lifetime++;
+                this.x += Math.cos(this.direction) * this.speed;
+                this.y += Math.sin(this.direction) * this.speed;
+
+                // Wrap around screen edges
+                this.x = (this.x + canvas.width) % canvas.width;
+                this.y = (this.y + canvas.height) % canvas.height;
+
+                // Adjust direction over time for a flowing effect
+                this.direction += (Math.random() - 0.5) * 0.05;
+            }
+
+            draw() {
+                const alpha = 1 - (this.lifetime / 200); // Fade out over time
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, ${alpha})`;
+                ctx.fill();
+            }
+        }
+
+        // Color palettes
+        const mouseMoveColors = [
+            {r: 102, g: 0, b: 204},   // Bright Purple
+            {r: 0, g: 102, b: 204},   // Bright Blue
+            {r: 0, g: 204, b: 102},   // Bright Cyan
+            {r: 102, g: 204, b: 0}    // Bright Lime
+        ];
+
+        const spontaneousColors = [
+            {r: 178, g: 0, b: 255},   // Very Bright Purple
+            {r: 0, g: 178, b: 255},   // Very Bright Blue
+            {r: 0, g: 255, b: 178},   // Very Bright Cyan
+            {r: 178, g: 255, b: 0}    // Very Bright Lime
+        ];
+
+        const nebulaColors = [
+            {r: 102, g: 0, b: 204},   // Bright Purple
+            {r: 0, g: 102, b: 204},   // Bright Blue
+            {r: 0, g: 204, b: 102},   // Bright Cyan
+            {r: 204, g: 102, b: 0},   // Bright Orange
+            {r: 204, g: 0, b: 102},   // Bright Maroon
+            {r: 0, g: 204, b: 204}    // Bright Teal
+        ];
+
+        let particles = [];
+        let nebulas = [];
+        let mouseX = canvas.width / 2;
+        let mouseY = canvas.height / 2;
+
+        // Nebula class for tail-only, chasing movement
+        class Nebula {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.color = nebulaColors[Math.floor(Math.random() * nebulaColors.length)];
+                this.baseSpeed = Math.random() * 0.5 + 0.2; // Increased base speed for faster movement
+                this.speed = this.baseSpeed; // Current speed, can vary
+                this.direction = Math.random() * Math.PI * 2;
+                this.radius = Math.random() * 4 + 3; // Tail width
+                this.wiggleFrequency = Math.random() * 0.05 + 0.02; // Mimic sperm-like movement
+                this.wiggleAmplitude = Math.random() * 40 + 20; // Reduced for less pronounced wagging
+                this.lifetime = 0;
+                this.targetDirection = this.direction; // For smooth turning
+                this.pathVariation = Math.random() * 0.3 - 0.15; // Variation in path to mouse
+                this.isChasing = true;
+                this.turnSpeed = Math.random() * 0.01 + 0.005; // Very slow turn speed with more variation
+                this.angleDifference = 0; // Added to keep track of the angle difference for drawing
+            }
+
+            update() {
+                let distance = Math.hypot(mouseX - this.x, mouseY - this.y);
+                if (distance < 10 && this.isChasing) {
+                    this.isChasing = false;
+                    this.targetDirection = this.direction;
+                } else if (distance > 20 && !this.isChasing) {
+                    this.isChasing = true;
+                }
+
+                if (this.isChasing) {
+                    let dx = mouseX - this.x;
+                    let dy = mouseY - this.y;
+                    let mouseDirection = Math.atan2(dy, dx);
+                    this.targetDirection = mouseDirection + this.pathVariation;
+                    this.speed = this.baseSpeed + Math.sin(this.lifetime * 0.01) * 0.2;
+
+                    this.x += Math.cos(this.direction) * this.speed;
+                    this.y += Math.sin(this.direction) * this.speed;
+                }
+
+                this.angleDifference = this.targetDirection - this.direction;
+                if (this.angleDifference > Math.PI) this.angleDifference -= Math.PI * 2;
+                if (this.angleDifference < -Math.PI) this.angleDifference += Math.PI * 2;
+                this.direction += this.angleDifference * this.turnSpeed;
+
+                this.lifetime++;
+                this.x = (this.x + canvas.width) % canvas.width;
+                this.y = (this.y + canvas.height) % canvas.height;
+            }
+
+            draw() {
+                ctx.strokeStyle = `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, 1)`;
+                ctx.beginPath();
+                const tailLength = canvas.width * 0.05; // Slightly more shortened
+                const points = 30; // Reduced for performance, still smooth enough
+                for (let j = 0; j <= points; j++) {
+                    let t = j / points;
+                    let tailWiggle = Math.sin(this.lifetime * this.wiggleFrequency * 2 + j * 0.1) * this.wiggleAmplitude * t;
+                    let bendAmount = Math.sin(t * Math.PI) * 0.5;
+                    let x = this.x + Math.cos(this.direction + Math.PI + bendAmount * this.angleDifference * t) * tailLength * t;
+                    let y = this.y + Math.sin(this.direction + Math.PI + bendAmount * this.angleDifference * t) * tailLength * t + tailWiggle;
+                    
+                    if (j === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                    
+                    // Line width decreases from front to back
+                    let lineWidth = this.radius * (1 - t * 0.7); // Thicker at the front, thinner at the back
+                    ctx.lineWidth = lineWidth;
+                }
+                ctx.stroke();
+            }
+        }
+
+        // Main animation loop
+        function animate() {
+            // Use slight transparency for trail effect for particles
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (Math.random() < 0.01 && nebulas.length < 7) {
+                nebulas.push(new Nebula());
+            }
+            
+            for (let i = nebulas.length - 1; i >= 0; i--) {
+                nebulas[i].update();
+                nebulas[i].draw();
+            }
+
+            if (Math.random() < 0.1) {
+                for (let i = 0; i < 3; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = Math.random() * 0.5 + 0.2;
+                    const color = spontaneousColors[Math.floor(Math.random() * spontaneousColors.length)];
+                    particles.push(new Particle(
+                        Math.random() * canvas.width, 
+                        Math.random() * canvas.height, 
+                        speed, 
+                        angle, 
+                        color
+                    ));
+                }
+            }
+
+            particles = particles.filter(p => p.lifetime < 200);
+            particles.forEach(particle => {
+                particle.update();
+                particle.draw();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        // Mouse interaction to update mouse position and add particles
+        canvas.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            for (let i = 0; i < 5; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 0.5 + 0.2;
+                const color = mouseMoveColors[Math.floor(Math.random() * mouseMoveColors.length)];
+                particles.push(new Particle(e.clientX, e.clientY, speed, angle, color));
+            }
+        });
+
+        animate(); // Start the animation
+    </script>
+</body>
+</html>

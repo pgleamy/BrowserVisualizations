@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>New Year's Fireworks Celebration</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+        }
+        canvas {
+            display: block;
+        }
+        .year {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: rgba(255, 255, 255, 0.1);
+            font-size: 15vw;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="year">2025</div>
+    <canvas id="canvas"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Set canvas size
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        // Particle class for both rockets and explosions
+        class Particle {
+            constructor(x, y, dx, dy, size, colors, lifeSpan) {
+                this.x = x;
+                this.y = y;
+                this.dx = dx;
+                this.dy = dy;
+                this.size = size;
+                this.colors = colors; // Array of colors
+                this.life = lifeSpan;
+                this.decay = 0.006 + Math.random() * 0.004; // Slower decay for longer display
+            }
+
+            update() {
+                this.x += this.dx;
+                this.y += this.dy;
+                this.dx *= 0.98; // Air drag
+                this.dy *= 0.98;
+                this.dy += 0.02; // Gravity
+                this.life -= this.decay;
+                return this.life > 0;
+            }
+
+            draw() {
+                const colorIndex = Math.min(Math.floor((1 - this.life) * this.colors.length), this.colors.length - 1);
+                const color = this.colors[colorIndex] || 'rgba(255, 255, 255, 1)';
+
+                const gradient = ctx.createRadialGradient(
+                    this.x, this.y, 0,
+                    this.x, this.y, this.size * 2
+                );
+                gradient.addColorStop(0, color.replace('1)', `${this.life})`));
+                gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = gradient;
+                ctx.fill();
+            }
+        }
+
+        // Firework class
+        class Firework {
+            constructor() {
+                this.reset();
+                this.exploded = false;
+                this.particles = [];
+            }
+
+            reset() {
+                this.x = Math.random() * canvas.width;
+                this.y = canvas.height;
+                this.targetY = Math.random() * (canvas.height * 0.3) + canvas.height * 0.2;
+                this.speed = Math.random() * 4 + 15;
+                this.angle = Math.PI / 2;
+                this.dx = Math.cos(this.angle) * this.speed;
+                this.dy = -Math.sin(this.angle) * this.speed;
+                this.hue = Math.random() * 360;
+                this.exploded = false;
+                this.particles = [];
+            }
+
+            update() {
+                if (!this.exploded) {
+                    this.x += this.dx;
+                    this.y += this.dy;
+                    this.dy += 0.1;
+
+                    if (this.y <= this.targetY) {
+                        this.explode();
+                    }
+                }
+
+                this.particles = this.particles.filter(particle => particle.update());
+                return this.particles.length > 0 || !this.exploded;
+            }
+
+            explode() {
+                this.exploded = true;
+                const particleCount = Math.floor(Math.random() * 80) + 50; // Increased number of particles
+
+                for (let i = 0; i < particleCount; i++) {
+                    const angle = (i / particleCount) * Math.PI * 2;
+                    const speed = Math.random() * 2 + 1; // Wider spread and speed
+
+                    this.particles.push(
+                        new Particle(
+                            this.x,
+                            this.y,
+                            Math.cos(angle) * speed,
+                            Math.sin(angle) * speed,
+                            Math.random() * 3 + 2, // Larger particles
+                            [
+                                `hsla(${this.hue + Math.random() * 30 - 15}, 100%, 70%, 1)`,
+                                `hsla(${this.hue + Math.random() * 30 - 15}, 100%, 50%, 1)`,
+                                `hsla(${this.hue + Math.random() * 30 - 15}, 100%, 30%, 1)`
+                            ],
+                            1.8 // Extended lifespan for larger explosions
+                        )
+                    );
+                }
+            }
+
+            draw() {
+                if (!this.exploded) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+                    ctx.fillStyle = `hsl(${this.hue}, 100%, 50%)`;
+                    ctx.fill();
+                }
+
+                this.particles.forEach(particle => particle.draw());
+            }
+        }
+
+        const fireworks = [];
+        let lastFireworkTime = Date.now();
+
+        function animate() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const now = Date.now();
+            if (now - lastFireworkTime > Math.random() * 1000 + 400) {
+                fireworks.push(new Firework());
+                lastFireworkTime = now;
+            }
+
+            for (let i = fireworks.length - 1; i >= 0; i--) {
+                if (!fireworks[i].update()) {
+                    fireworks.splice(i, 1);
+                } else {
+                    fireworks[i].draw();
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+
+        canvas.addEventListener('click', (e) => {
+            const firework = new Firework();
+            firework.x = e.clientX;
+            firework.y = canvas.height;
+            firework.targetY = e.clientY;
+            fireworks.push(firework);
+        });
+    </script>
+</body>
+</html>
+
+
