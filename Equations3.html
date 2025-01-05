@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Final Visualization with Restored Fractal Animation & Thick Interference Lines</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background-color: #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-family: sans-serif;
+    }
+    #controls {
+      margin-bottom: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 10px;
+      border-radius: 5px;
+      display: flex;
+      gap: 10px;
+    }
+    button {
+      background: #333;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background: #444;
+    }
+    #glCanvas {
+      border: 1px solid #333;
+      box-shadow: 0 0 10px rgba(255,255,255,0.1);
+      cursor: grab;
+    }
+    #glCanvas:active {
+      cursor: grabbing;
+    }
+    .slider-group {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 10px;
+      border-radius: 5px;
+      display: none;
+      max-height: 85vh;
+      overflow-y: auto;
+      font-size: 0.7em;
+    }
+    .slider-group label {
+      display: block;
+      margin-top: 8px;
+      color: #000;
+    }
+    .slider-group input {
+      width: 140px;
+      font-size: 0.7em;
+    }
+    #equationDisplay {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      color: white;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 10px;
+      border-radius: 5px;
+      font-family: monospace;
+      max-width: 320px;
+      line-height: 1.4em;
+    }
+  </style>
+</head>
+<body>
+<div id="controls">
+  <button onclick="setVisualization('mandelbrot')">Mandelbrot</button>
+  <button onclick="setVisualization('julia')">Julia</button>
+  <button onclick="setVisualization('lissajous')">Lissajous</button>
+  <button onclick="setVisualization('butterfly')">Butterfly</button>
+  <button onclick="setVisualization('interference')">Interference</button>
+</div>
+
+<canvas id="glCanvas"></canvas>
+
+<!-- FRACTALS: Mandelbrot & Julia -->
+<div id="fractalSliders" class="slider-group">
+  <label for="maxIter">Max Iterations</label>
+  <input type="range" id="maxIter" min="50" max="10000" step="50" value="2300">
+
+  <label for="colorCycle">Color Cycle (Base)</label>
+  <input type="range" id="colorCycle" min="0.1" max="5" step="0.1" value="1.0">
+
+  <label for="baseHue">Base Hue</label>
+  <input type="range" id="baseHue" min="0" max="360" step="1" value="200">
+
+  <label for="saturation">Saturation</label>
+  <input type="range" id="saturation" min="0" max="1" step="0.01" value="0.6">
+
+  <label for="fractalSpeed">Fractal Anim Speed</label>
+  <input type="range" id="fractalSpeed" min="0.01" max="2" step="0.01" value="1.0">
+
+  <label for="juliaCX" id="juliaCXLabel">Julia c.x</label>
+  <input type="range" id="juliaCX" min="-1" max="1" step="0.01" value="-0.4">
+
+  <label for="juliaCY" id="juliaCYLabel">Julia c.y</label>
+  <input type="range" id="juliaCY" min="-1" max="1" step="0.01" value="0.6">
+</div>
+
+<!-- Lissajous -->
+<div id="lissajousSliders" class="slider-group">
+  <label for="lissaA">Lissajous A</label>
+  <input type="range" id="lissaA" min="1" max="10" step="1" value="9">
+
+  <label for="lissaB">Lissajous B</label>
+  <input type="range" id="lissaB" min="1" max="10" step="1" value="10">
+
+  <label for="lineColorCycle_lissa">Line Color Cycle</label>
+  <input type="range" id="lineColorCycle_lissa" min="0.1" max="5" step="0.1" value="1.0">
+
+  <label for="lissaSpeed">Lissajous Anim Speed</label>
+  <input type="range" id="lissaSpeed" min="0.01" max="2" step="0.01" value="2">
+</div>
+
+<!-- Butterfly -->
+<div id="butterflySliders" class="slider-group">
+  <label for="butterflyFreq1">Freq1 (cos)</label>
+  <input type="range" id="butterflyFreq1" min="1" max="10" step="0.1" value="6">
+
+  <label for="butterflyFreq2">Freq2 (cos)</label>
+  <input type="range" id="butterflyFreq2" min="1" max="10" step="0.1" value="5">
+
+  <label for="butterflyFreq3">Freq3 (sin^5)</label>
+  <input type="range" id="butterflyFreq3" min="1" max="24" step="1" value="12">
+
+  <label for="butterflyAmp">Amplitude</label>
+  <input type="range" id="butterflyAmp" min="0.5" max="7.5" step="0.1" value="5.5">
+
+  <label for="lineColorCycle_butterfly">Line Color Cycle</label>
+  <input type="range" id="lineColorCycle_butterfly" min="0.1" max="5" step="0.1" value="3">
+
+  <label for="butterflySpeed">Butterfly Anim Speed</label>
+  <input type="range" id="butterflySpeed" min="0.01" max="10" step="0.01" value="4">
+</div>
+
+<!-- Interference -->
+<div id="interferenceSliders" class="slider-group">
+  <label for="waveCount">Number of Waves (1-3)</label>
+  <input type="range" id="waveCount" min="1" max="3" step="1" value="3">
+
+  <!-- For each wave, we have frequency & amplitude -->
+  <label for="wave1">Wave 1 Frequency</label>
+  <input type="range" id="wave1" min="1" max="5" step="1" value="1">
+
+  <label for="amp1">Wave 1 Amplitude</label>
+  <input type="range" id="amp1" min="10" max="300" step="5" value="250">
+
+  <label for="wave2">Wave 2 Frequency</label>
+  <input type="range" id="wave2" min="1" max="5" step="1" value="2">
+
+  <label for="amp2">Wave 2 Amplitude</label>
+  <input type="range" id="amp2" min="10" max="300" step="5" value="100">
+
+  <label for="wave3">Wave 3 Frequency</label>
+  <input type="range" id="wave3" min="1" max="5" step="1" value="3">
+
+  <label for="amp3">Wave 3 Amplitude</label>
+  <input type="range" id="amp3" min="10" max="300" step="5" value="50">
+
+  <label for="lineColorCycle_interf">Line Color Cycle</label>
+  <input type="range" id="lineColorCycle_interf" min="0.1" max="5" step="0.1" value="1.0">
+
+  <label for="interfSpeed">Interference Anim Speed</label>
+  <input type="range" id="interfSpeed" min="0.01" max="15" step="0.01" value="2">
+</div>
+
+<div id="equationDisplay"></div>
+
+<script>
+////////////////////////////////////////////////////////////////////////////////
+// GLOBALS
+////////////////////////////////////////////////////////////////////////////////
+let gl, canvas;
+let currentVisualization = 'mandelbrot';
+
+// Pan/zoom for fractals
+let offsetX = 0.0, offsetY = 0.0;
+let scaleFactor = 1.0;
+let isPanning = false;
+let lastMouseX, lastMouseY;
+
+// Programs
+let fractalProgram, lineProgram;
+let lineBuffer;
+
+// Fractal uniform locations
+let uResolution, uOffset, uScale, uMaxIter, uColorCycle,
+    uBaseHue, uSaturation, uFractalType, uJuliaC, uAnimSpeed;
+
+const FRACTAL_MANDELBROT = 1.0;
+const FRACTAL_JULIA      = 2.0;
+
+let width, height;
+let startTime = 0;
+
+////////////////////////////////////////////////////////////////////////////////
+// SHADERS
+////////////////////////////////////////////////////////////////////////////////
+const fractalVertexSrc = `
+attribute vec2 aPosition;
+void main() {
+  gl_Position = vec4(aPosition, 0.0, 1.0);
+}
+`;
+
+const fractalFragmentSrc = `
+precision highp float;
+
+uniform vec2  uResolution;
+uniform vec2  uOffset;
+uniform float uScale;
+uniform float uMaxIter;
+uniform float uColorCycle;
+uniform float uBaseHue;
+uniform float uSaturation;
+uniform float uFractalType;
+uniform vec2  uJuliaC;
+uniform float uAnimSpeed;
+
+vec3 hslToRgb(float h, float s, float l) {
+  float c = (1.0 - abs(2.0*l - 1.0)) * s;
+  float hp = mod(h, 360.0) / 60.0;
+  float x = c * (1.0 - abs(mod(hp,2.0) - 1.0));
+  vec3 rgb;
+  if (hp<1.0)      rgb = vec3(c,x,0);
+  else if (hp<2.0) rgb = vec3(x,c,0);
+  else if (hp<3.0) rgb = vec3(0,c,x);
+  else if (hp<4.0) rgb = vec3(0,x,c);
+  else if (hp<5.0) rgb = vec3(x,0,c);
+  else             rgb = vec3(c,0,x);
+  float m = l - c*0.5;
+  return rgb + m;
+}
+
+void main() {
+  vec2 coord = gl_FragCoord.xy;
+  vec2 z = (coord - uResolution*0.5) / (uResolution.y*0.5) * uScale + uOffset;
+
+  float maxIter = uMaxIter;
+  float iter = 0.0;
+  vec2 c;
+
+  if (uFractalType < 1.5) {
+    // Mandelbrot
+    c = z;
+    z = vec2(0.0);
+  } else {
+    // Julia
+    c = uJuliaC;
+  }
+
+  for (float i=0.0; i<3000.0; i++) {
+    if (i >= maxIter) break;
+    float x2 = z.x*z.x;
+    float y2 = z.y*z.y;
+    if (x2 + y2 > 4.0) {
+      iter = i;
+      break;
+    }
+    z.y = 2.0*z.x*z.y + c.y;
+    z.x = x2 - y2 + c.x;
+  }
+
+  if (iter >= maxIter) {
+    gl_FragColor = vec4(0.0, 0.0, 0.05, 1.0);
+    return;
+  }
+
+  float log_zn = 0.5 * log(z.x*z.x + z.y*z.y) / log(2.0);
+  float nu = log(log_zn / log(2.0)) / log(2.0);
+  float fractIter = (iter + 1.0) - nu;
+
+  float colorFactor = fractIter * uColorCycle * 10.0;
+  float hue = mod(uBaseHue + colorFactor * uAnimSpeed, 360.0);
+
+  vec3 rgb = hslToRgb(hue, uSaturation, 0.5);
+  gl_FragColor = vec4(rgb, 1.0);
+}
+`;
+
+const lineVertexSrc = `
+attribute vec2 aPosition;
+attribute vec3 aColor;
+uniform vec2 uResolution;
+varying vec3 vColor;
+void main() {
+  vColor = aColor;
+  vec2 clipSpace = (aPosition / uResolution)*2.0 - 1.0;
+  clipSpace.y = -clipSpace.y;
+  gl_Position = vec4(clipSpace, 0.0, 1.0);
+}
+`;
+
+const lineFragmentSrc = `
+precision highp float;
+varying vec3 vColor;
+
+void main() {
+  // We're using geometry (triangles) to simulate thick lines, so no special fade:
+  gl_FragColor = vec4(vColor, 1.0);
+}
+`;
+
+////////////////////////////////////////////////////////////////////////////////
+// INIT
+////////////////////////////////////////////////////////////////////////////////
+function initWebGL() {
+  canvas = document.getElementById('glCanvas');
+
+  const dpr = window.devicePixelRatio || 1;
+  const maxWidth  = Math.min(window.innerWidth - 40, 1200);
+  const maxHeight = Math.min(window.innerHeight - 100, 800);
+  canvas.style.width  = maxWidth + 'px';
+  canvas.style.height = maxHeight + 'px';
+  canvas.width  = maxWidth  * dpr;
+  canvas.height = maxHeight * dpr;
+  width  = canvas.width;
+  height = canvas.height;
+
+  gl = canvas.getContext('webgl', { antialias: true, alpha: false });
+  if (!gl) {
+    alert('WebGL not supported');
+    return;
+  }
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+  // Compile programs
+  fractalProgram = createProgram(fractalVertexSrc, fractalFragmentSrc);
+  lineProgram    = createProgram(lineVertexSrc,   lineFragmentSrc);
+
+  // Look up fractal uniforms
+  uResolution  = gl.getUniformLocation(fractalProgram, 'uResolution');
+  uOffset      = gl.getUniformLocation(fractalProgram, 'uOffset');
+  uScale       = gl.getUniformLocation(fractalProgram, 'uScale');
+  uMaxIter     = gl.getUniformLocation(fractalProgram, 'uMaxIter');
+  uColorCycle  = gl.getUniformLocation(fractalProgram, 'uColorCycle');
+  uBaseHue     = gl.getUniformLocation(fractalProgram, 'uBaseHue');
+  uSaturation  = gl.getUniformLocation(fractalProgram, 'uSaturation');
+  uFractalType = gl.getUniformLocation(fractalProgram, 'uFractalType');
+  uJuliaC      = gl.getUniformLocation(fractalProgram, 'uJuliaC');
+  uAnimSpeed   = gl.getUniformLocation(fractalProgram, 'uAnimSpeed');
+
+  lineBuffer = gl.createBuffer();
+  gl.viewport(0, 0, width, height);
+
+  // Resize event
+  window.addEventListener('resize', onResize);
+
+  // Mouse for fractals
+  canvas.addEventListener('mousedown', onMouseDown);
+  canvas.addEventListener('mousemove', onMouseMove);
+  canvas.addEventListener('mouseup',   () => isPanning = false);
+  canvas.addEventListener('mouseleave',() => isPanning = false);
+  canvas.addEventListener('wheel', onWheel, { passive: false });
+
+  startTime = performance.now();
+  requestAnimationFrame(animate);
+}
+
+function onResize() {
+  const dpr = window.devicePixelRatio || 1;
+  const maxWidth  = Math.min(window.innerWidth - 40, 1200);
+  const maxHeight = Math.min(window.innerHeight - 100, 800);
+  canvas.style.width  = maxWidth + 'px';
+  canvas.style.height = maxHeight + 'px';
+
+  canvas.width  = maxWidth  * dpr;
+  canvas.height = maxHeight * dpr;
+  width  = canvas.width;
+  height = canvas.height;
+  gl.viewport(0, 0, width, height);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// MOUSE (FRACTALS)
+////////////////////////////////////////////////////////////////////////////////
+function onMouseDown(e) {
+  if (currentVisualization === 'mandelbrot' || currentVisualization === 'julia') {
+    isPanning = true;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+  }
+}
+function onMouseMove(e) {
+  if (!isPanning) return;
+  const dx = e.clientX - lastMouseX;
+  const dy = e.clientY - lastMouseY;
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+  offsetX -= dx * (2.0/height) * scaleFactor;
+  offsetY += dy * (2.0/height) * scaleFactor;
+}
+function onWheel(e) {
+  if (currentVisualization !== 'mandelbrot' && currentVisualization !== 'julia') return;
+  e.preventDefault();
+  const zoomFactor = 1.05;
+  if (e.deltaY < 0) scaleFactor /= zoomFactor;
+  else scaleFactor *= zoomFactor;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// ANIMATION LOOP
+////////////////////////////////////////////////////////////////////////////////
+function animate() {
+  requestAnimationFrame(animate);
+  draw();
+}
+
+function draw() {
+  gl.clearColor(0,0,0,1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+  updateEquationDisplay();
+
+  if (currentVisualization === 'mandelbrot' || currentVisualization === 'julia') {
+    drawFractal();
+  } else {
+    drawLines();
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// FRACTAL DRAW
+////////////////////////////////////////////////////////////////////////////////
+function drawFractal() {
+  gl.useProgram(fractalProgram);
+
+  // Fullscreen quad
+  const quad = new Float32Array([-1,-1, 1,-1, -1,1, 1,1]);
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
+
+  const aPos = gl.getAttribLocation(fractalProgram, 'aPosition');
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+  // Gather slider values
+  const maxIterVal  = parseFloat(document.getElementById('maxIter').value);
+  const colorCycleVal = parseFloat(document.getElementById('colorCycle').value);
+  const baseHueVal  = parseFloat(document.getElementById('baseHue').value);
+  const satVal      = parseFloat(document.getElementById('saturation').value);
+  const speedVal    = parseFloat(document.getElementById('fractalSpeed').value);
+  const juliaCXVal  = parseFloat(document.getElementById('juliaCX').value);
+  const juliaCYVal  = parseFloat(document.getElementById('juliaCY').value);
+
+  let type = (currentVisualization === 'mandelbrot') ? FRACTAL_MANDELBROT : FRACTAL_JULIA;
+
+  // Subtle additional time-based color shift
+  const now = performance.now();
+  const t = (now - startTime)*0.001;
+  const animatedCycle = colorCycleVal + 0.02 * Math.sin(t);
+
+  // Set uniforms
+  gl.uniform2f(uResolution, width, height);
+  gl.uniform2f(uOffset, offsetX, offsetY);
+  gl.uniform1f(uScale, scaleFactor);
+  gl.uniform1f(uMaxIter, maxIterVal);
+  gl.uniform1f(uColorCycle, animatedCycle);
+  gl.uniform1f(uBaseHue, baseHueVal);
+  gl.uniform1f(uSaturation, satVal);
+  gl.uniform1f(uAnimSpeed, speedVal);
+  gl.uniform1f(uFractalType, type);
+  gl.uniform2f(uJuliaC, juliaCXVal, juliaCYVal);
+
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  gl.deleteBuffer(buf);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// LINE-BASED VISUALIZATIONS
+////////////////////////////////////////////////////////////////////////////////
+function drawLines() {
+  gl.useProgram(lineProgram);
+
+  const now = performance.now();
+  const elapsed = (now - startTime)*0.001;
+
+  if (currentVisualization === 'lissajous') {
+    let linePositions = [];
+    const A = parseFloat(document.getElementById('lissaA').value);
+    const B = parseFloat(document.getElementById('lissaB').value);
+    const colCycle = parseFloat(document.getElementById('lineColorCycle_lissa').value);
+    const speed    = parseFloat(document.getElementById('lissaSpeed').value);
+
+    const steps = 1500;
+    const scale = Math.min(width, height)/3;
+    for (let i=0; i<steps; i++) {
+      let T = (i/steps)*2.0*Math.PI + elapsed*speed;
+      let x = Math.sin(A*T)*scale + width/2;
+      let y = Math.sin(B*T)*scale + height/2;
+
+      // Color per vertex
+      let hue = (i*0.3 + elapsed*30.0)*colCycle % 360;
+      let [r,g,b_] = hslToRgb(hue, 0.7, 0.5);
+      linePositions.push(x,y, r,g,b_);
+    }
+    drawLineStrip(linePositions); // normal line
+  }
+  else if (currentVisualization === 'butterfly') {
+    let linePositions = [];
+    const f1 = parseFloat(document.getElementById('butterflyFreq1').value);
+    const f2 = parseFloat(document.getElementById('butterflyFreq2').value);
+    const f3 = parseFloat(document.getElementById('butterflyFreq3').value);
+    const amp= parseFloat(document.getElementById('butterflyAmp').value);
+    const colCycle = parseFloat(document.getElementById('lineColorCycle_butterfly').value);
+    const speed    = parseFloat(document.getElementById('butterflySpeed').value);
+
+    const steps=2000;
+    const baseScale=Math.min(width,height)/4;
+    for (let i=0; i<steps; i++) {
+      let T = i*(12.0*Math.PI/steps) + elapsed*speed;
+      let rVal = Math.exp(Math.cos(f1*T)) - amp*Math.cos(f2*T) + Math.pow(Math.sin(T/f3),5.0);
+      let x = (rVal*Math.cos(T))*(baseScale/4) + width/2;
+      let y = (rVal*Math.sin(T))*(baseScale/4) + height/2;
+
+      let hue = (i*0.3 + elapsed*40.0)*colCycle % 360;
+      let [rc,gc,bc] = hslToRgb(hue, 0.8, 0.5);
+      linePositions.push(x,y, rc,gc,bc);
+    }
+    drawLineStrip(linePositions); // normal line
+  }
+  else if (currentVisualization === 'interference') {
+    // We'll build thick lines using triangles
+    const count = parseInt(document.getElementById('waveCount').value);
+    const freqArray = [
+      parseFloat(document.getElementById('wave1').value),
+      parseFloat(document.getElementById('wave2').value),
+      parseFloat(document.getElementById('wave3').value)
+    ];
+    const ampArray = [
+      parseFloat(document.getElementById('amp1').value),
+      parseFloat(document.getElementById('amp2').value),
+      parseFloat(document.getElementById('amp3').value)
+    ];
+
+    const colCycle = parseFloat(document.getElementById('lineColorCycle_interf').value);
+    const speed    = parseFloat(document.getElementById('interfSpeed').value);
+
+    // 1) Draw each wave individually as thick lines (2px)
+    for (let w=0; w<count; w++) {
+      let wavePositions = [];
+      let freq = freqArray[w];
+      let amp  = ampArray[w];
+      let dir = (w % 2 === 0) ? +1 : -1;
+
+      let waveHueBase = (w*60 + elapsed*30.0)*colCycle;
+      for (let i=0; i<width; i++) {
+        let phase = (2.0*Math.PI*i/width) + elapsed*speed*dir;
+        let y = height/2 + amp*Math.sin(freq*phase);
+
+        let hue = (waveHueBase + i*0.05) % 360;
+        let [rC,gC,bC] = hslToRgb(hue, 0.75, 0.5);
+        wavePositions.push(i, y, rC, gC, bC);
+      }
+      // Use "drawThickWave" to draw 2px-thick line
+      drawThickWave(wavePositions, 3.0);
+    }
+
+    // 2) Combined wave in white (4px wide)
+    let comboPositions = [];
+    for (let i=0; i<width; i++) {
+      let sum=0;
+      for (let w=0; w<count; w++) {
+        let freq = freqArray[w];
+        let amp  = ampArray[w];
+        let dir  = (w % 2 === 0) ? +1 : -1;
+        let phase = (2.0*Math.PI*i/width) + elapsed*speed*dir;
+        sum += amp*Math.sin(freq*phase);
+      }
+      let y = height/2 + sum/count;
+      // color=white
+      comboPositions.push(i, y, 1.0, 1.0, 1.0);
+    }
+    drawThickWave(comboPositions, 18);
+  }
+}
+
+// Original line-based draw
+function drawLineStrip(vertexData) {
+  gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexData), gl.STATIC_DRAW);
+
+  const aPos = gl.getAttribLocation(lineProgram, 'aPosition');
+  const aColor = gl.getAttribLocation(lineProgram, 'aColor');
+  const stride = 5*4; // 5 floats => x,y,r,g,b
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, stride, 0);
+  gl.enableVertexAttribArray(aColor);
+  gl.vertexAttribPointer(aColor, 3, gl.FLOAT, false, stride, 2*4);
+
+  const uRes = gl.getUniformLocation(lineProgram, 'uResolution');
+  gl.uniform2f(uRes, width, height);
+
+  gl.drawArrays(gl.LINE_STRIP, 0, vertexData.length/5);
+}
+
+/**
+ * Generate thick triangles for a wave. We build quads for each segment.
+ * This is minimal geometry-based thickness, no fade effect included.
+ */
+function drawThickWave(vertexData, lineWidthPx) {
+  // 1) Build array of triangle vertices
+  const thickVerts = generateThickLineVertices(vertexData, lineWidthPx);
+
+  // 2) Buffer & draw
+  gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, thickVerts, gl.STATIC_DRAW);
+
+  const aPos = gl.getAttribLocation(lineProgram, 'aPosition');
+  const aColor = gl.getAttribLocation(lineProgram, 'aColor');
+  const stride = 5*4; // x,y,r,g,b
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, stride, 0);
+  gl.enableVertexAttribArray(aColor);
+  gl.vertexAttribPointer(aColor, 3, gl.FLOAT, false, stride, 2*4);
+
+  const uRes = gl.getUniformLocation(lineProgram, 'uResolution');
+  gl.uniform2f(uRes, width, height);
+
+  // Now draw triangles
+  gl.drawArrays(gl.TRIANGLES, 0, thickVerts.length / 5);
+}
+
+/**
+ * Convert a set of line points (x,y,r,g,b) into triangles for a thick line.
+ * We'll treat each pair of consecutive points as a segment. For each segment:
+ *   - compute direction
+ *   - compute normal
+ *   - offset left/right
+ *   - produce 2 triangles
+ */
+function generateThickLineVertices(points, lineWidth) {
+  // "points" is [ x0,y0,r0,g0,b0, x1,y1,r1,g1,b1, ... ]
+  const floats = [];
+  const halfW = lineWidth * 0.5;
+  for (let i=0; i < points.length/5 - 1; i++) {
+    const idx0 = i*5;
+    const idx1 = (i+1)*5;
+
+    const x0 = points[idx0 + 0];
+    const y0 = points[idx0 + 1];
+    const r0 = points[idx0 + 2];
+    const g0 = points[idx0 + 3];
+    const b0 = points[idx0 + 4];
+
+    const x1 = points[idx1 + 0];
+    const y1 = points[idx1 + 1];
+    const r1 = points[idx1 + 2];
+    const g1 = points[idx1 + 3];
+    const b1 = points[idx1 + 4];
+
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    if (len < 1e-6) continue; // skip zero-length
+
+    // Normal
+    let nx = -dy / len;
+    let ny =  dx / len;
+
+    // Offsets for left & right
+    const lwx = nx * halfW;
+    const lwy = ny * halfW;
+
+    // We'll produce 2 triangles. 
+    // "Left" side: (x0-lwx, y0-lwy), (x1-lwx, y1-lwy)
+    // "Right" side: (x0+lwx, y0+lwy), (x1+lwx, y1+lwy)
+
+    // Tri #1: left0, left1, right0
+    floats.push(
+      // left0
+      x0 - lwx, y0 - lwy, r0, g0, b0,
+      // left1
+      x1 - lwx, y1 - lwy, r1, g1, b1,
+      // right0
+      x0 + lwx, y0 + lwy, r0, g0, b0
+    );
+
+    // Tri #2: right0, left1, right1
+    floats.push(
+      x0 + lwx, y0 + lwy, r0, g0, b0,
+      x1 - lwx, y1 - lwy, r1, g1, b1,
+      x1 + lwx, y1 + lwy, r1, g1, b1
+    );
+  }
+  return new Float32Array(floats);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// HELPERS
+////////////////////////////////////////////////////////////////////////////////
+function createProgram(vsSrc, fsSrc) {
+  const vs = compileShader(vsSrc, gl.VERTEX_SHADER);
+  const fs = compileShader(fsSrc, gl.FRAGMENT_SHADER);
+  const prog = gl.createProgram();
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    console.error('Could not link:', gl.getProgramInfoLog(prog));
+    gl.deleteProgram(prog);
+    return null;
+  }
+  return prog;
+}
+
+function compileShader(src, type) {
+  const sh = gl.createShader(type);
+  gl.shaderSource(sh, src);
+  gl.compileShader(sh);
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+    console.error('Shader error:', gl.getShaderInfoLog(sh));
+    gl.deleteShader(sh);
+    return null;
+  }
+  return sh;
+}
+
+/** Basic HSL->RGB for the line-based colors. */
+function hslToRgb(h, s, l) {
+  let c = (1 - Math.abs(2*l - 1)) * s;
+  let hp = h/60.0;
+  let x = c*(1 - Math.abs((hp%2)-1));
+  let r=0, g=0, b=0;
+  if (hp<1) {r=c;g=x;b=0;}
+  else if (hp<2){r=x;g=c;b=0;}
+  else if (hp<3){r=0;g=c;b=x;}
+  else if (hp<4){r=0;g=x;b=c;}
+  else if (hp<5){r=x;g=0;b=c;}
+  else {r=c;g=0;b=x;}
+  let m = l - c*0.5;
+  return [r+m, g+m, b+m];
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// UI
+////////////////////////////////////////////////////////////////////////////////
+function setVisualization(name) {
+  currentVisualization = name;
+
+  // Hide all slider panels
+  document.getElementById('fractalSliders').style.display      = 'none';
+  document.getElementById('lissajousSliders').style.display    = 'none';
+  document.getElementById('butterflySliders').style.display    = 'none';
+  document.getElementById('interferenceSliders').style.display = 'none';
+
+  if (name === 'mandelbrot' || name === 'julia') {
+    offsetX=0; offsetY=0; scaleFactor=1;
+    document.getElementById('fractalSliders').style.display = 'block';
+    if (name === 'julia') {
+      document.getElementById('juliaCXLabel').style.display = 'block';
+      document.getElementById('juliaCX').style.display      = 'block';
+      document.getElementById('juliaCYLabel').style.display = 'block';
+      document.getElementById('juliaCY').style.display      = 'block';
+    } else {
+      document.getElementById('juliaCXLabel').style.display = 'none';
+      document.getElementById('juliaCX').style.display      = 'none';
+      document.getElementById('juliaCYLabel').style.display = 'none';
+      document.getElementById('juliaCY').style.display      = 'none';
+    }
+  }
+  else if (name === 'lissajous') {
+    document.getElementById('lissajousSliders').style.display='block';
+  }
+  else if (name === 'butterfly') {
+    document.getElementById('butterflySliders').style.display='block';
+  }
+  else if (name === 'interference') {
+    document.getElementById('interferenceSliders').style.display='block';
+  }
+}
+
+/**
+ * Update the textual equation display in bottom-right corner.
+ */
+function updateEquationDisplay() {
+  const eq = document.getElementById('equationDisplay');
+  let msg = '';
+
+  switch (currentVisualization) {
+    case 'mandelbrot': {
+      msg = `
+        <b>MANDELBROT</b><br>
+        z<sub>n+1</sub> = z<sub>n</sub><sup>2</sup> + c<br>
+        <span style="font-size:0.85em; color:#ccc;">
+          ZOOM: mouse wheel<br>
+          PAN: click and drag<br>
+        </span>
+      `;
+      break;
+    }
+    case 'julia': {
+      msg = `
+        <b>JULIA</b><br>
+        z<sub>n+1</sub> = z<sub>n</sub><sup>2</sup> + c<br>
+	<span style="font-size:0.85em; color:#ccc;">
+          ZOOM: mouse wheel<br>
+          PAN: click and drag<br>
+        </span>
+      `;
+      break;
+    }
+    case 'lissajous': {
+      msg = `
+        <b>LISSAJOUS</b><br>
+        x = sin(A·t), y = sin(B·t)<br>
+      `;
+      break;
+    }
+    case 'butterfly': {
+      msg = `
+        <b>BUTTERFLY</b><br>
+        r = e<sup>cos(freq1·t)</sup><br> 
+        - amp·cos(freq2·t)<br> 
+        + sin<sup>5</sup>(t/freq3)<br>
+      `;
+      break;
+    }
+    case 'interference': {
+      msg = `
+        <b>INTERFERENCE</b><br>
+        y = Σ A<sub>i</sub> · sin( ω<sub>i</sub> x + φ<sub>i</sub> )<br>
+        <span style="font-size:0.85em; color:#ccc;">
+          White wave calculates the<br>
+          interference pattern between<br>
+          the three colored waves<br>
+        </span>
+      `;
+      break;
+    }
+    default:
+      msg = 'Select a visualization.';
+      break;
+  }
+  eq.innerHTML = msg;
+}
+
+// START
+initWebGL();
+setVisualization('mandelbrot');
+</script>
+</body>
+</html>
+
+

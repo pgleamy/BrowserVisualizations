@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Pong with Aspect Ratio</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle, #1e1e1e, #333333);
+            flex-direction: column;
+        }
+        #game-container {
+            position: relative;
+            width: 75%; /* Initial width percentage */
+            height: 100%; /* Fill the screen vertically */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        canvas {
+            border: 5px solid white;
+            background: radial-gradient(circle, #000000, #1a1a1a);
+            display: block;
+        }
+        #new-game {
+            display: none;
+            font-size: 18px;
+            padding: 10px 20px;
+            background-color: white;
+            color: black;
+            border: none;
+            cursor: pointer;
+            position: absolute;
+            top: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10; /* Ensure it's above the canvas */
+        }
+        #winner {
+            position: absolute;
+            font-size: 24px;
+            color: white;
+            text-align: center;
+            display: none;
+            z-index: 5;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <button id="new-game">PLAY AGAIN</button>
+        <canvas id="pong"></canvas>
+        <div id="winner"></div>
+    </div>
+    <script>
+        const canvas = document.getElementById('pong');
+        const ctx = canvas.getContext('2d');
+        const newGameButton = document.getElementById('new-game');
+        const winnerText = document.getElementById('winner');
+        const container = document.getElementById('game-container');
+
+        // Function to set canvas size dynamically with 4:3 aspect ratio
+        function resizeCanvas() {
+            const containerHeight = container.clientHeight;
+            const containerWidth = containerHeight * (4 / 3); // Maintain 4:3 aspect ratio
+            canvas.width = containerWidth;
+            canvas.height = containerHeight;
+            canvas.style.width = `${containerWidth}px`;
+            canvas.style.height = `${containerHeight}px`;
+        }
+
+        // Resize canvas initially and on window resize
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Game Constants
+        const PADDLE_WIDTH = 10;
+        const PADDLE_HEIGHT = 100;
+        const BALL_RADIUS = 8;
+        const PADDLE_SPEED = 7;
+        const BALL_SPEED = 2.5;
+        const MAX_BALL_SPEED = 5; 
+        const MAX_SCORE = 10;
+
+        let ball = { x: canvas.width / 2, y: canvas.height / 2, dx: 0, dy: 0 };
+        let paddle1 = { x: 10, y: canvas.height / 2 - PADDLE_HEIGHT / 2 };
+        let paddle2 = { x: canvas.width - 20, y: canvas.height / 2 - PADDLE_HEIGHT / 2 };
+        let score1 = 0, score2 = 0;
+        let paddle1Dir = 0, paddle2Dir = 0;
+        let gameOver = false;
+        let obstacles = [];
+
+        // Web Audio API for Sound Effects
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(baseFrequency, duration = 0.2, harmonics = [1, 2, 4]) {
+            harmonics.forEach((multiplier) => {
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                oscillator.type = 'sine';
+                oscillator.frequency.value = baseFrequency * multiplier;
+                gainNode.gain.value = 0.1 / multiplier;
+                oscillator.connect(gainNode).connect(audioCtx.destination);
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + duration);
+            });
+        }
+
+        function playPaddleCollisionSound() {
+            playSound(440); // "Ping" sound
+        }
+
+        function playWallCollisionSound() {
+            playSound(220); // "Pong" sound
+        }
+
+        function playScoreSound() {
+            playSound(660, 0.3, [1, 1.5, 2]); // Tri-tone celebratory sound
+        }
+
+        // Event Listeners for Paddle Movement and Ball Start
+        document.addEventListener('keydown', (e) => {
+            if (ball.dx === 0 && ball.dy === 0 && !gameOver) {
+                // Start the ball on first key press
+                ball.dx = (Math.random() > 0.5 ? 1 : -1) * BALL_SPEED;
+                ball.dy = (Math.random() > 0.5 ? 1 : -1) * BALL_SPEED;
+            }
+
+            if (e.key === 'a') paddle1Dir = -1;
+            if (e.key === 'z') paddle1Dir = 1;
+            if (e.key === 'k') paddle2Dir = -1;
+            if (e.key === 'm') paddle2Dir = 1;
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'a' || e.key === 'z') paddle1Dir = 0;
+            if (e.key === 'k' || e.key === 'm') paddle2Dir = 0;
+        });
+
+        newGameButton.addEventListener('click', () => {
+            resetGame();
+        });
+
+        // Reset Game
+        function resetGame() {
+            ball.x = canvas.width / 2;
+            ball.y = canvas.height / 2;
+            ball.dx = 0;
+            ball.dy = 0;
+            score1 = 0;
+            score2 = 0;
+            paddle1.y = canvas.height / 2 - PADDLE_HEIGHT / 2;
+            paddle2.y = canvas.height / 2 - PADDLE_HEIGHT / 2;
+            gameOver = false;
+            winnerText.style.display = 'none';
+            newGameButton.style.display = 'none';
+            obstacles = [];
+            spawnObstacle(); // Start obstacle spawning
+            gameLoop();
+        }
+
+        // Generate Random Obstacles
+        function spawnObstacle() {
+            const obstacleX = canvas.width / 3 + Math.random() * (canvas.width / 3);
+            const obstacleY = Math.random() * canvas.height;
+            const obstacle = { x: obstacleX, y: obstacleY, width: 20, height: 20, opacity: 0, timer: 0 };
+            obstacles.push(obstacle);
+
+            // Fade in, remain visible, and fade out
+            const fadeIn = setInterval(() => {
+                obstacle.opacity += 0.1;
+                if (obstacle.opacity >= 1) clearInterval(fadeIn);
+            }, 50);
+
+            setTimeout(() => {
+                const fadeOut = setInterval(() => {
+                    obstacle.opacity -= 0.1;
+                    if (obstacle.opacity <= 0) {
+                        clearInterval(fadeOut);
+                        obstacles = obstacles.filter(o => o !== obstacle); // Remove obstacle
+                    }
+                }, 50);
+            }, 5000);
+
+            // Spawn another obstacle in 3–7 seconds
+            setTimeout(spawnObstacle, Math.random() * 4000 + 3000);
+        }
+
+        // Reset Ball and Paddles After Scoring
+        function resetBallAndPaddles() {
+            ball.x = canvas.width / 2;
+            ball.y = canvas.height / 2;
+            ball.dx = 0;
+            ball.dy = 0;
+            paddle1.y = canvas.height / 2 - PADDLE_HEIGHT / 2;
+            paddle2.y = canvas.height / 2 - PADDLE_HEIGHT / 2;
+        }
+
+        // Draw a dashed "net" line down the center
+        function drawCenterLine() {
+            ctx.save();
+            ctx.setLineDash([15, 15]); // Dashed line segments
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // Update Positions
+        function update() {
+            if (gameOver) return;
+
+            paddle1.y += paddle1Dir * PADDLE_SPEED;
+            paddle2.y += paddle2Dir * PADDLE_SPEED;
+
+            paddle1.y = Math.max(0, Math.min(canvas.height - PADDLE_HEIGHT, paddle1.y));
+            paddle2.y = Math.max(0, Math.min(canvas.height - PADDLE_HEIGHT, paddle2.y));
+
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+
+            // Limit the ball speed
+            ball.dx = Math.max(-MAX_BALL_SPEED, Math.min(MAX_BALL_SPEED, ball.dx));
+            ball.dy = Math.max(-MAX_BALL_SPEED, Math.min(MAX_BALL_SPEED, ball.dy));
+
+            // Ball collision with top and bottom walls
+            if (ball.y <= BALL_RADIUS || ball.y >= canvas.height - BALL_RADIUS) {
+                ball.dy *= -1;
+                playWallCollisionSound();
+            }
+
+            // Check ball collision with obstacles
+            obstacles.forEach(obstacle => {
+                if (
+                    ball.x + BALL_RADIUS > obstacle.x &&
+                    ball.x - BALL_RADIUS < obstacle.x + obstacle.width &&
+                    ball.y + BALL_RADIUS > obstacle.y &&
+                    ball.y - BALL_RADIUS < obstacle.y + obstacle.height
+                ) {
+                    ball.dx *= -1;
+                    ball.dy *= -1;
+                }
+            });
+
+            // Ball collision with paddles
+            if (
+                ball.x - BALL_RADIUS <= paddle1.x + PADDLE_WIDTH &&
+                ball.y >= paddle1.y &&
+                ball.y <= paddle1.y + PADDLE_HEIGHT &&
+                ball.dx < 0
+            ) {
+                ball.dx *= -1.1; // Reverse direction
+                ball.dy += (ball.y - (paddle1.y + PADDLE_HEIGHT / 2)) * 0.1;
+                playPaddleCollisionSound();
+            }
+
+            if (
+                ball.x + BALL_RADIUS >= paddle2.x &&
+                ball.y >= paddle2.y &&
+                ball.y <= paddle2.y + PADDLE_HEIGHT &&
+                ball.dx > 0
+            ) {
+                ball.dx *= -1.1; // Reverse direction
+                ball.dy += (ball.y - (paddle2.y + PADDLE_HEIGHT / 2)) * 0.1;
+                playPaddleCollisionSound();
+            }
+
+            // Scoring
+            if (ball.x <= 0) {
+                score2++;
+                playScoreSound();
+                // Only reset if the game isn't over
+                if (score2 >= MAX_SCORE) {
+                    endGame('Player 2 Wins!');
+                } else {
+                    resetBallAndPaddles();
+                }
+            } else if (ball.x >= canvas.width) {
+                score1++;
+                playScoreSound();
+                // Only reset if the game isn't over
+                if (score1 >= MAX_SCORE) {
+                    endGame('Player 1 Wins!');
+                } else {
+                    resetBallAndPaddles();
+                }
+            }
+        }
+
+        // End Game
+        function endGame(winner) {
+            gameOver = true;
+            winnerText.innerText = winner;
+            winnerText.style.display = 'block';
+            newGameButton.style.display = 'block';
+        }
+
+        // Render Game
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw center net
+            drawCenterLine();
+
+            // Draw paddles with glow
+            ctx.save();
+            ctx.shadowBlur = 15;
+            
+            // Left paddle
+            ctx.shadowColor = '#0f0';
+            const paddleGradient1 = ctx.createLinearGradient(0, paddle1.y, 0, paddle1.y + PADDLE_HEIGHT);
+            paddleGradient1.addColorStop(0, '#00ff00');
+            paddleGradient1.addColorStop(1, '#008000');
+            ctx.fillStyle = paddleGradient1;
+            ctx.fillRect(paddle1.x, paddle1.y, PADDLE_WIDTH, PADDLE_HEIGHT);
+
+            // Right paddle
+            ctx.shadowColor = '#f00';
+            const paddleGradient2 = ctx.createLinearGradient(0, paddle2.y, 0, paddle2.y + PADDLE_HEIGHT);
+            paddleGradient2.addColorStop(0, '#ff0000');
+            paddleGradient2.addColorStop(1, '#800000');
+            ctx.fillStyle = paddleGradient2;
+            ctx.fillRect(paddle2.x, paddle2.y, PADDLE_WIDTH, PADDLE_HEIGHT);
+            ctx.restore();
+
+            // Draw ball with glow
+            ctx.save();
+            ctx.shadowColor = '#ffffff';
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            ctx.closePath();
+            ctx.restore();
+
+            // Draw obstacles
+            obstacles.forEach(obstacle => {
+                ctx.fillStyle = `rgba(255, 255, 0, ${obstacle.opacity})`;
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+            });
+
+            // Draw scores
+            ctx.font = '20px Arial';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(`Player 1: ${score1}`, 20, 30);
+            ctx.fillText(`Player 2: ${score2}`, canvas.width - 120, 30);
+        }
+
+        // Game Loop
+        function gameLoop() {
+            if (!gameOver) {
+                update();
+                render();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        resetGame();
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+

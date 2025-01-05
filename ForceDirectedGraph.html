@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Artistic Force-Directed Graph with Special Node</title>
+    <style>
+        body { overflow: hidden; margin: 0; }
+        #graph { width: 100vw; height: 100vh; background: #000; }
+        .node { stroke: rgba(255, 255, 255, 0.4); stroke-width: 1px; }
+        .link { 
+            stroke: rgba(255, 255, 255, 0.1); 
+            stroke-width: 1px; 
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .label { 
+            font: 12px 'Courier New', monospace; 
+            pointer-events: none; 
+            display: none; 
+            color: rgba(255, 255, 255, 0.8); 
+        }
+        .node:hover .label { display: block; }
+
+        .glass-sphere {
+            stroke-width: 1;
+            stroke: rgba(255, 255, 255, 0.2);
+        }
+
+        .ghost-tail {
+            stroke: rgba(255, 255, 255, 0.05);
+            stroke-width: 1;
+            fill: none;
+        }
+
+        .glow {
+            filter: url(#glow);
+        }
+
+        .star {
+            fill: white;
+            opacity: 0.1;
+        }
+
+        .special-node {
+            stroke: rgba(255, 255, 255, 0.5);
+            stroke-width: 2px;
+        }
+    </style>
+</head>
+<body>
+    <svg id="graph">
+        <defs>
+            <radialGradient id="glassGradient" cx="50%" cy="50%" r="75%" fx="50%" fy="50%">
+                <stop offset="0%" style="stop-color:white;stop-opacity:0.7" />
+                <stop offset="80%" style="stop-color:white;stop-opacity:0.4" />
+                <stop offset="100%" style="stop-color:rgb(100, 100, 100);stop-opacity:0.5" />
+            </radialGradient>
+            <filter id="glow">
+                <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+                <feMerge>
+                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+            </filter>
+            <radialGradient id="specialGradient" cx="50%" cy="50%" r="75%" fx="50%" fy="50%">
+                <stop offset="0%" style="stop-color:#FFD700;stop-opacity:0.9" /> <!-- Gold color -->
+                <stop offset="100%" style="stop-color:#8B4513;stop-opacity:0.5" /> <!-- Darker brown -->
+            </radialGradient>
+        </defs>
+        <g id="stars"></g>
+    </svg>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script>
+        const svg = d3.select("#graph"),
+            width = window.innerWidth,
+            height = window.innerHeight,
+            g = svg.append("g").attr("transform", `translate(${width / 2},${height / 2})`);
+
+        // Generate stars for the background
+        const stars = d3.select("#stars");
+        for (let i = 0; i < 200; i++) {
+            stars.append("circle")
+                .attr("cx", Math.random() * width)
+                .attr("cy", Math.random() * height)
+                .attr("r", Math.random() * 0.5)
+                .attr("class", "star");
+        }
+
+        // Generate a larger network of nodes and links with more pronounced size differences
+        const numNodes = 40;
+        const nodes = Array.from({length: numNodes}, (_, i) => ({
+            id: `N${i}`, 
+            name: `Node ${i}`, 
+            size: 5 + Math.pow(Math.random(), 2) * 20
+        }));
+        const links = [];
+
+        for (let i = 0; i < numNodes; i++) {
+            for (let j = i + 1; j < numNodes; j++) {
+                if (Math.random() < 0.2) { 
+                    links.push({source: `N${i}`, target: `N${j}`});
+                }
+            }
+        }
+
+        // Add a special node
+        const specialNode = {
+            id: "Special", 
+            name: "Wanderer", 
+            size: 15, 
+            x: 0, 
+            y: 0,
+            vx: 0.1,  
+            vy: 0.1,  
+            angle: 0, // For spiral movement
+            radius: 0, // Current radius in spiral movement
+            direction: 1 // 1 for outward, -1 for inward
+        };
+        nodes.push(specialNode);
+
+        // More artistic color scheme
+        const color = d3.scaleOrdinal(d3.schemeSet3);
+
+        // Enhanced force simulation with size-based forces
+        const simulation = d3.forceSimulation(nodes)
+            .force("link", d3.forceLink(links).id(d => d.id).distance(d => 50 + d.source.size * 3 + d.target.size * 3).strength(.2))  
+            .force("charge", d3.forceManyBody().strength(d => d.id === "Special" ? -d.size * 10 : -d.size * 30))
+            .force("center", d3.forceCenter())
+            .force("collide", d3.forceCollide(d => d.size * 1.5).strength(0.7))
+            .alphaDecay(0) // Set to 0 to never decay and thus never stop
+            .alphaMin(0.001)
+            .velocityDecay(0.4);
+
+        // Add a slight wiggling effect
+        function wiggle(d) {
+            if (d.id === "Special") {
+                return `translate(${d.x}, ${d.y})`;
+            }
+            return `translate(${d.x + (Math.random() - 0.5) * 0.2}, ${d.y + (Math.random() - 0.5) * 2})`;
+        }
+
+        // Links with subtle glow
+        const link = g.append("g")
+            .attr("class", "links")
+            .selectAll("line")
+            .data(links)
+            .enter().append("line")
+            .attr("class", "glow");
+
+        // Nodes with labels, size/mass, and color variation, including glow effect
+        const node = g.append("g")
+            .attr("class", "nodes")
+            .selectAll("g")
+            .data(nodes)
+            .enter().append("g")
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended));
+
+        node.append("circle")
+            .attr("r", d => d.size)
+            .attr("fill", d => d.id === "Special" ? "url(#specialGradient)" : color(d.id))
+            .attr("stroke", d => d.id === "Special" ? "rgba(255, 255, 255, 0.5)" : "rgba(255, 255, 255, 0.2)")
+            .attr("stroke-width", d => d.id === "Special" ? 2 : 1)
+            .attr("class", d => d.id === "Special" ? "special-node glow" : "glass-sphere glow");
+
+        node.append("text")
+            .attr("class", "label")
+            .attr("dy", "0.35em")
+            .text(d => d.name)
+            .attr("fill", "white");
+
+        // Ghosting tail effect for all nodes
+        const tail = node.append("path")
+            .attr("class", "ghost-tail")
+            .attr("d", d => `M${d.x},${d.y} L${d.x},${d.y}`);
+
+        // Constants for special node behavior
+        const SPIRAL_SPEED = 0.04; // Increased by 4 times from 0.01
+        const MAX_RADIUS = 250;   // Maximum radius of the spiral
+        const REPULSION_FACTOR = 5; // Increased to ensure no contact
+
+        // Custom movement for special node
+        function moveSpecialNode() {
+            // Spiral movement
+            specialNode.angle += SPIRAL_SPEED * specialNode.direction;
+            specialNode.radius += SPIRAL_SPEED * specialNode.direction;
+
+            // Change direction when reaching the max radius or back to center
+            if (specialNode.radius >= MAX_RADIUS || specialNode.radius <= 0) {
+                specialNode.direction *= -1;
+            }
+
+            // Calculate new position in spiral
+            let newX = specialNode.radius * Math.cos(specialNode.angle);
+            let newY = specialNode.radius * Math.sin(specialNode.angle);
+
+            // Check for repulsion from other nodes
+            nodes.forEach(node => {
+                if (node.id !== "Special") {
+                    let dx = newX - node.x;
+                    let dy = newY - node.y;
+                    let distance = Math.hypot(dx, dy);
+                    if (distance < specialNode.size + node.size + 50) { // Ensure no contact by adding buffer
+                        // Adjust the force calculation so smaller nodes are more affected
+                        const force = REPULSION_FACTOR * specialNode.size / (distance * distance * distance * (node.size / 5 + 1)); // Smaller nodes are pushed more
+                        newX += dx / distance * force;
+                        newY += dy / distance * force;
+                    }
+                }
+            });
+
+            // Update the position with repulsion effect
+            specialNode.x = newX;
+            specialNode.y = newY;
+
+            // Cap the speed to ensure smooth movement, further reduced for smoothness
+            const speed = Math.hypot(specialNode.vx, specialNode.vy);
+            if (speed > 0.2) { // Lower speed cap for smoother flow
+                specialNode.vx *= 0.2 / speed;
+                specialNode.vy *= 0.2 / speed;
+            }
+
+            // Add minimal random walk for organic movement
+            specialNode.vx += (Math.random() - 0.5) * 0.1;
+            specialNode.vy += (Math.random() - 0.5) * 0.1;
+        }
+
+        // Simulation tick function with ghosting and special node movement
+        simulation.on("tick", () => {
+            link
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+
+            moveSpecialNode(); // Move the special node
+
+            node.attr("transform", d => {
+                const oldTail = tail.attr("d");
+                tail.attr("d", `M${oldTail.split("L")[1] || d.x},${oldTail.split("L")[2] || d.y} L${d.x},${d.y}`);
+                return wiggle(d);
+            });
+        });
+
+        // Drag functions
+        function dragstarted(event, d) {
+            if (d.id !== "Special") {
+                simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+        }
+
+        function dragged(event, d) {
+            if (d.id !== "Special") {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+        }
+
+        function dragended(event, d) {
+            if (d.id !== "Special") {
+                simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+        }
+
+        // Zoom functionality
+        svg.call(d3.zoom()
+            .extent([[0, 0], [width, height]])
+            .scaleExtent([1/4, 4])
+            .on("zoom", ({transform}) => g.attr("transform", transform)));
+
+        // Start the simulation for animation to begin, and keep it running
+        simulation.restart();
+
+        // Ensure the special node starts from the center in case of page load or resize
+        specialNode.x = 0;
+        specialNode.y = 0;
+    </script>
+</body>
+</html>
