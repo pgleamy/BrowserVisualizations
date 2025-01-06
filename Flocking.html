@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>3D Fish School Simulation</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #0e2f44; 
+            font-family: Arial, sans-serif; 
+        }
+
+        /* Control Panel Styles */
+        #controlPanel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 220px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            transition: opacity 0.5s;
+            opacity: 0;
+            color: white;
+        }
+
+        /* Show control panel on hover */
+        #controlPanel:hover {
+            opacity: 1;
+        }
+
+        /* Labels and Inputs */
+        .controlGroup {
+            margin-bottom: 10px;
+        }
+
+        .controlGroup label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .controlGroup input[type="range"] {
+            width: 100%;
+        }
+
+        /* Tooltip for better visibility */
+        #controlPanel::before {
+            content: "Control Panel";
+            position: absolute;
+            top: -20px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 12px;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        #controlPanel:hover::before {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <!-- Control Panel -->
+    <div id="controlPanel">
+        <div class="controlGroup">
+            <label for="fishCount">Number of Fish: <span id="fishCountLabel">350</span></label>
+            <input type="range" id="fishCount" min="50" max="700" value="300">
+        </div>
+        <div class="controlGroup">
+            <label for="maxSpeed">Max Speed: <span id="maxSpeedLabel">4.5</span></label>
+            <input type="range" id="maxSpeed" min="2.3" max="6" step="0.1" value="4.5">
+        </div>
+        <div class="controlGroup">
+            <label for="separationDistance">Separation Distance: <span id="separationDistanceLabel">300</span></label>
+            <input type="range" id="separationDistance" min="200" max="600" value="270">
+        </div>
+        <div class="controlGroup">
+            <label for="alignmentDistance">Alignment Distance: <span id="alignmentDistanceLabel">500</span></label>
+            <input type="range" id="alignmentDistance" min="100" max="1000" value="650">
+        </div>
+        <div class="controlGroup">
+            <label for="cohesionDistance">Cohesion Distance: <span id="cohesionDistanceLabel">500</span></label>
+            <input type="range" id="cohesionDistance" min="100" max="1000" value="650">
+        </div>
+    </div>
+
+    <!-- three.js Library -->
+    <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+    <!-- OrbitControls -->
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+    // Scene Setup
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0e2f44);
+
+    // Camera Setup
+    const camera = new THREE.PerspectiveCamera(
+        75, 
+        window.innerWidth / window.innerHeight, 
+        0.1, 
+        1000
+    );
+    camera.position.set(0, 50, 100);
+    camera.lookAt(0, 0, 0); // Ensure camera is looking at the origin
+
+    // Renderer Setup
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Orbit Controls
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true; // Adds smoothness to controls
+    controls.dampingFactor = 0.05;
+    controls.enablePan = false; // *** DISABLE PAN TO PREVENT INTERFERENCE ***
+
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(100, 100, 100);
+    scene.add(directionalLight);
+
+    // Utility Functions
+    function getDistance(a, b) {
+        return a.position.distanceTo(b.position);
+    }
+
+    function limitVector(vector, max) {
+        if (vector.length() > max) {
+            vector.setLength(max);
+        }
+    }
+
+    // Boundary Parameters (Tank Dimensions)
+    let tankSizeX, tankSizeY, tankSizeZ; // Dynamic tank boundaries
+
+    // Function to Update Tank Size Based on Window and Camera
+    function updateTankSize() {
+        const target = new THREE.Vector3(0, 0, 0); // Assuming the center is at origin
+        const distance = camera.position.distanceTo(target);
+        const fov = camera.fov;
+        const aspect = camera.aspect;
+
+        // Calculate visible height and width at the target distance
+        const visibleHeight = 2 * distance * Math.tan(THREE.MathUtils.degToRad(fov / 2));
+        const visibleWidth = visibleHeight * aspect;
+
+        tankSizeY = visibleHeight / 2;
+        tankSizeX = visibleWidth / 2;
+        tankSizeZ = tankSizeY; // Assuming depth is equal to height
+
+        // Optionally, update visual representation of the tank here
+    }
+
+    updateTankSize(); // Initial tank size calculation
+
+    // Fish Class
+    class Fish {
+        constructor(x, y, z, isLeader = false) {
+            this.position = new THREE.Vector3(x, y, z);
+            const angle = Math.random() * 2 * Math.PI;
+            const phi = Math.random() * Math.PI * 2;
+            this.velocity = new THREE.Vector3(
+                Math.cos(angle) * Math.sin(phi),
+                Math.sin(angle) * Math.sin(phi),
+                Math.cos(phi)
+            );
+            this.velocity.normalize();
+            this.acceleration = new THREE.Vector3(0, 0, 0);
+            this.isLeader = isLeader;
+            this.maxSpeed = isLeader ? 4.5 : parseFloat(document.getElementById('maxSpeed').value);
+            this.minSpeed = isLeader ? 2.0 : parseFloat(document.getElementById('maxSpeed').min); // Define a minimum speed
+            this.maxForce = isLeader ? 0.05 : 0.03;
+            this.size = isLeader ? 2 : 1;
+            this.createMesh();
+        }
+
+        createMesh() {
+            const geometry = new THREE.ConeGeometry(this.size, this.size * 2, 8);
+            const material = new THREE.MeshLambertMaterial({ color: this.isLeader ? 0xFFD700 : 0xFFFFFF });
+            this.mesh = new THREE.Mesh(geometry, material);
+            this.mesh.position.copy(this.position);
+            // Orient the fish in the direction of velocity
+            this.updateMeshOrientation();
+            scene.add(this.mesh);
+        }
+
+        updateMeshOrientation() {
+            const axis = new THREE.Vector3(0, 1, 0); // Cone is initially pointing up
+            const quaternion = new THREE.Quaternion();
+            quaternion.setFromUnitVectors(axis, this.velocity.clone().normalize());
+            this.mesh.quaternion.copy(quaternion);
+        }
+
+        applyForce(force) {
+            this.acceleration.add(force);
+        }
+
+        update() {
+            // Update velocity
+            this.velocity.add(this.acceleration);
+            // Limit speed
+            limitVector(this.velocity, this.maxSpeed);
+            // Ensure minimum speed
+            if (this.velocity.length() < this.minSpeed) {
+                this.velocity.setLength(this.minSpeed);
+            }
+            // Update position
+            this.position.add(this.velocity);
+            // Reset acceleration
+            this.acceleration.set(0, 0, 0);
+            // Boundary confinement with reflection
+            ['x', 'y', 'z'].forEach(axis => {
+                const axisSize = axis === 'x' ? tankSizeX : (axis === 'y' ? tankSizeY : tankSizeZ);
+                if (this.position[axis] > axisSize) {
+                    this.position[axis] = axisSize;
+                    this.velocity[axis] *= -1;
+                }
+                if (this.position[axis] < -axisSize) {
+                    this.position[axis] = -axisSize;
+                    this.velocity[axis] *= -1;
+                }
+            });
+            // Update mesh position and orientation
+            this.mesh.position.copy(this.position);
+            this.updateMeshOrientation();
+        }
+    }
+
+    // Initialize Fish School
+    let fishCount = parseInt(document.getElementById('fishCount').value);
+    let fish = [];
+
+    // Create Leader Fish at Center
+    const leader = new Fish(0, 0, 0, true);
+    fish.push(leader);
+
+    // Create Follower Fish around Leader
+    for (let i = 0; i < fishCount - 1; i++) {
+        const angle = Math.random() * 2 * Math.PI;
+        const phi = Math.random() * Math.PI * 2;
+        const distance = 20 + Math.random() * 50;
+        const x = leader.position.x - Math.cos(angle) * Math.sin(phi) * distance;
+        const y = leader.position.y - Math.sin(angle) * Math.sin(phi) * distance;
+        const z = leader.position.z - Math.cos(phi) * distance;
+        fish.push(new Fish(x, y, z));
+    }
+
+    // Control Panel Elements
+    const controlPanel = document.getElementById('controlPanel');
+    const fishCountSlider = document.getElementById('fishCount');
+    const fishCountLabel = document.getElementById('fishCountLabel');
+    const maxSpeedSlider = document.getElementById('maxSpeed');
+    const maxSpeedLabel = document.getElementById('maxSpeedLabel');
+    const separationDistanceSlider = document.getElementById('separationDistance');
+    const separationDistanceLabel = document.getElementById('separationDistanceLabel');
+    const alignmentDistanceSlider = document.getElementById('alignmentDistance');
+    const alignmentDistanceLabel = document.getElementById('alignmentDistanceLabel');
+    const cohesionDistanceSlider = document.getElementById('cohesionDistance');
+    const cohesionDistanceLabel = document.getElementById('cohesionDistanceLabel');
+
+    // Current Parameters
+    let parameters = {
+        fishCount: fishCount,
+        maxSpeed: parseFloat(maxSpeedSlider.value),
+        separationDistance: parseFloat(separationDistanceSlider.value),
+        alignmentDistance: parseFloat(alignmentDistanceSlider.value),
+        cohesionDistance: parseFloat(cohesionDistanceSlider.value)
+    };
+
+    // Update Labels
+    function updateLabels() {
+        fishCountLabel.textContent = parameters.fishCount;
+        maxSpeedLabel.textContent = parameters.maxSpeed.toFixed(1);
+        separationDistanceLabel.textContent = parameters.separationDistance;
+        alignmentDistanceLabel.textContent = parameters.alignmentDistance;
+        cohesionDistanceLabel.textContent = parameters.cohesionDistance;
+    }
+
+    updateLabels();
+
+    // Event Listeners for Controls
+    fishCountSlider.addEventListener('input', (e) => {
+        parameters.fishCount = parseInt(e.target.value);
+        fishCountLabel.textContent = parameters.fishCount;
+        adjustFishCount();
+    });
+
+    maxSpeedSlider.addEventListener('input', (e) => {
+        parameters.maxSpeed = parseFloat(e.target.value);
+        maxSpeedLabel.textContent = parameters.maxSpeed.toFixed(1);
+        // Update maxSpeed and minSpeed for all fish
+        fish.forEach(f => {
+            f.maxSpeed = parameters.maxSpeed;
+            if (f.isLeader) {
+                f.minSpeed = 2.0; // Ensure leader has a defined minSpeed
+            } else {
+                f.minSpeed = parseFloat(maxSpeedSlider.min);
+            }
+        });
+    });
+
+    separationDistanceSlider.addEventListener('input', (e) => {
+        parameters.separationDistance = parseFloat(e.target.value);
+        separationDistanceLabel.textContent = parameters.separationDistance;
+    });
+
+    alignmentDistanceSlider.addEventListener('input', (e) => {
+        parameters.alignmentDistance = parseFloat(e.target.value);
+        alignmentDistanceLabel.textContent = parameters.alignmentDistance;
+    });
+
+    cohesionDistanceSlider.addEventListener('input', (e) => {
+        parameters.cohesionDistance = parseFloat(e.target.value);
+        cohesionDistanceLabel.textContent = parameters.cohesionDistance;
+    });
+
+    // Function to Adjust Fish Count
+    function adjustFishCount() {
+        const currentCount = fish.length;
+        if (parameters.fishCount > currentCount) {
+            const toAdd = parameters.fishCount - currentCount;
+            for (let i = 0; i < toAdd; i++) {
+                const angle = Math.random() * 2 * Math.PI;
+                const phi = Math.random() * Math.PI * 2;
+                const distance = 20 + Math.random() * 50;
+                const x = leader.position.x - Math.cos(angle) * Math.sin(phi) * distance;
+                const y = leader.position.y - Math.sin(angle) * Math.sin(phi) * distance;
+                const z = leader.position.z - Math.cos(phi) * distance;
+                const newFish = new Fish(x, y, z);
+                newFish.maxSpeed = parameters.maxSpeed;
+                newFish.minSpeed = parseFloat(maxSpeedSlider.min);
+                fish.push(newFish);
+            }
+        } else if (parameters.fishCount < currentCount) {
+            const toRemove = currentCount - parameters.fishCount;
+            for (let i = 0; i < toRemove; i++) {
+                const removedFish = fish.pop();
+                scene.remove(removedFish.mesh);
+            }
+        }
+    }
+
+    // Animation Loop
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update(); // Required if controls.enableDamping = true
+
+        // Update Tank Size in case the window has been resized
+        updateTankSize();
+
+        // Update Leader
+        leaderBehavior(leader);
+
+        // Update Followers
+        for (let i = 1; i < fish.length; i++) {
+            const current = fish[i];
+            const force = new THREE.Vector3();
+
+            // Follow the leader
+            const desired = leader.position.clone().sub(leader.velocity.clone().multiplyScalar(30));
+            const steer = desired.clone().sub(current.position);
+            steer.setLength(0.05);
+            force.add(steer);
+
+            // Separation
+            const separation = new THREE.Vector3();
+            let total = 0;
+            for (let j = 0; j < fish.length; j++) {
+                if (j === i) continue;
+                const other = fish[j];
+                const d = current.position.distanceTo(other.position);
+                if (d < parameters.separationDistance) { // Separation distance
+                    const diff = current.position.clone().sub(other.position).normalize().divideScalar(d);
+                    separation.add(diff);
+                    total++;
+                }
+            }
+            if (total > 0) {
+                separation.divideScalar(total);
+                separation.setLength(parameters.maxSpeed);
+                separation.sub(current.velocity);
+                limitVector(separation, 0.05); // Adjusted force limit for better control
+                force.add(separation);
+            }
+
+            // Alignment
+            const alignment = new THREE.Vector3();
+            total = 0;
+            for (let j = 0; j < fish.length; j++) {
+                if (j === i) continue;
+                const other = fish[j];
+                const d = current.position.distanceTo(other.position);
+                if (d < parameters.alignmentDistance) { // Alignment distance
+                    alignment.add(other.velocity);
+                    total++;
+                }
+            }
+            if (total > 0) {
+                alignment.divideScalar(total);
+                alignment.setLength(parameters.maxSpeed);
+                alignment.sub(current.velocity);
+                limitVector(alignment, 0.03); // Adjusted force limit
+                force.add(alignment);
+            }
+
+            // Cohesion
+            const cohesion = new THREE.Vector3();
+            total = 0;
+            for (let j = 0; j < fish.length; j++) {
+                if (j === i) continue;
+                const other = fish[j];
+                const d = current.position.distanceTo(other.position);
+                if (d < parameters.cohesionDistance) { // Cohesion distance
+                    cohesion.add(other.position);
+                    total++;
+                }
+            }
+            if (total > 0) {
+                cohesion.divideScalar(total);
+                cohesion.sub(current.position);
+                cohesion.setLength(parameters.maxSpeed);
+                cohesion.sub(current.velocity);
+                limitVector(cohesion, 0.03); // Adjusted force limit
+                force.add(cohesion);
+            }
+
+            // Random Deviation
+            const randomDeviation = new THREE.Vector3(
+                (Math.random() - 0.5) * 0.02, 
+                (Math.random() - 0.5) * 0.02, 
+                (Math.random() - 0.5) * 0.02
+            );
+            force.add(randomDeviation);
+
+            current.applyForce(force);
+        }
+
+        // Update All Fish
+        fish.forEach(f => f.update());
+
+        renderer.render(scene, camera);
+    }
+
+    // Leader Behavior Enhancement for Smooth Movement
+    function leaderBehavior(leader) {
+        if (!isDragging) { // Only apply automatic movement if not dragging
+            // Define a target direction that changes smoothly over time
+            if (Math.random() < 0.005) { // Lower probability for smoother changes
+                const angleChange = (Math.random() - 0.5) * 0.2; // Wider angle changes
+                const axis = new THREE.Vector3(Math.random(), Math.random(), Math.random()).normalize();
+                const quaternion = new THREE.Quaternion();
+                quaternion.setFromAxisAngle(axis, angleChange);
+                leader.velocity.applyQuaternion(quaternion).normalize();
+            }
+
+            // Apply acceleration to vary speed
+            const speedChangeProbability = 0.02; // Probability to change speed each frame
+            if (Math.random() < speedChangeProbability) {
+                // Randomly decide to accelerate or decelerate
+                const accelerate = Math.random() < 0.5;
+                const speedChange = accelerate ? 0.1 : -0.1;
+                const accelerationForce = new THREE.Vector3(0, 0, 0);
+                accelerationForce.copy(leader.velocity).normalize().multiplyScalar(speedChange);
+                leader.applyForce(accelerationForce);
+            }
+
+            // Optionally, apply slight random acceleration for more natural movement
+            const randAcc = new THREE.Vector3(
+                (Math.random() - 0.5) * 0.005, 
+                (Math.random() - 0.5) * 0.005, 
+                (Math.random() - 0.5) * 0.005
+            );
+            leader.applyForce(randAcc);
+        }
+    }
+
+    // Drag Controls for Leader Fish
+    let isDragging = false;
+    let dragOffset = new THREE.Vector3();
+    let raycaster = new THREE.Raycaster();
+    let mouse = new THREE.Vector2();
+    let prevMousePos = new THREE.Vector2();
+
+    function onMouseDown(event) {
+        // Calculate mouse position in normalized device coordinates (-1 to +1) for both components.
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+
+        // Check if leader is intersected
+        const intersects = raycaster.intersectObject(leader.mesh);
+        if (intersects.length > 0) {
+            isDragging = true;
+            controls.enabled = false; // Disable OrbitControls while dragging
+            // Store the initial mouse position
+            prevMousePos.set(event.clientX, event.clientY);
+            // Reset leader's velocity to zero to stop automatic movement during drag
+            leader.velocity.set(0, 0, 0);
+
+            // Prevent OrbitControls from handling this event
+            event.preventDefault();
+            event.stopPropagation();
+        }
+    }
+
+    function onMouseMoveDrag(event) {
+        if (isDragging) {
+            // Current mouse position
+            const currentMousePos = new THREE.Vector2(event.clientX, event.clientY);
+
+            // Calculate mouse movement delta
+            const deltaX = currentMousePos.x - prevMousePos.x;
+            const deltaY = currentMousePos.y - prevMousePos.y;
+
+            // Define scaling factors to map mouse movement to world coordinates
+            const scaleX = 0.2;
+            const scaleY = 0.2;
+            const scaleZ = 0.15;
+
+            // Update leader's position based on mouse movement
+            leader.position.x += deltaX * scaleX;
+            leader.position.y += -deltaY * scaleY; // Invert Y to match screen coordinates
+            leader.position.z += -deltaY * scaleZ; // Pushing mouse up increases Z (moves forward)
+
+            // Clamp leader's position within tank boundaries
+            ['x', 'y', 'z'].forEach(axis => {
+                const axisSize = axis === 'x' ? tankSizeX : (axis === 'y' ? tankSizeY : tankSizeZ);
+                if (leader.position[axis] > axisSize) {
+                    leader.position[axis] = axisSize;
+                }
+                if (leader.position[axis] < -axisSize) {
+                    leader.position[axis] = -axisSize;
+                }
+            });
+
+            // Update mesh position and orientation
+            leader.mesh.position.copy(leader.position);
+            leader.updateMeshOrientation();
+
+            // Update previous mouse position
+            prevMousePos.copy(currentMousePos);
+
+            // Prevent OrbitControls from handling this event
+            event.preventDefault();
+            event.stopPropagation();
+        }
+    }
+
+    function onMouseMove(event) {
+        if (isDragging) {
+            onMouseMoveDrag(event);
+        }
+    }
+
+    function onMouseUp(event) {
+        if (isDragging) {
+            isDragging = false;
+            controls.enabled = true; // Re-enable OrbitControls after dragging
+
+            // Prevent OrbitControls from handling this event
+            event.preventDefault();
+            event.stopPropagation();
+        }
+    }
+
+    // Attach event listeners to renderer.domElement instead of window
+    renderer.domElement.addEventListener('mousedown', onMouseDown, false);
+    renderer.domElement.addEventListener('mousemove', onMouseMove, false);
+    renderer.domElement.addEventListener('mouseup', onMouseUp, false);
+    renderer.domElement.addEventListener('mouseleave', onMouseUp, false); // Handle case when mouse leaves the window
+
+    // Handle Window Resize
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        updateTankSize(); // Recalculate tank boundaries
+    }, false);
+
+    // Start Animation
+    animate();
+    </script>
+</body>
+</html>
+
