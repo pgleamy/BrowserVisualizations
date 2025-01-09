@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Equation Explorer: Animated Point Cloud</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: row;
+            height: 100vh;
+            background-color: #111;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+
+        #controlPanel {
+            width: 33%;
+            background-color: #222;
+            padding: 15px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+
+        #displayPanel {
+            flex-grow: 1;
+            position: relative;
+        }
+
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .slider {
+            margin: 5px 0;
+            font-size: 10px;
+        }
+
+        .equation-parameters {
+            display: none;
+            margin-bottom: 15px;
+        }
+
+        .equation-parameters.active {
+            display: block;
+        }
+
+        .equation-parameters h4 {
+            margin: 5px 0;
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        /* Enhanced Control Panel Styles */
+        details {
+            margin-bottom: 10px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 5px;
+            background-color: #333;
+        }
+
+        summary {
+            font-weight: bold;
+            cursor: pointer;
+            outline: none;
+        }
+
+        /* Tooltip Styling */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 200px;
+            background-color: #555;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%; /* Position above the element */
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 10px;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div id="controlPanel">
+        <h2>Equation Explorer</h2>
+
+        <!-- Enhanced Equation Selectors with Collapsible Sections and Tooltips -->
+        
+        <!-- Equation 1 -->
+        <details open>
+            <summary>Equation 1</summary>
+            <div class="tooltip">
+                <label>
+                    <input type="checkbox" id="equation1" checked title="Toggle Equation 1 on or off">
+                    Equation 1
+                </label>
+            </div>
+            <div class="tooltip">
+                <label for="effect1">Effect:</label>
+                <select id="effect1" title="Select whether to add or subtract the equation's effect">
+                    <option value="add">Add</option>
+                    <option value="subtract">Subtract</option>
+                </select>
+            </div>
+            <div id="equation1Parameters" class="equation-parameters active">
+                <h4>Equation 1 Parameters</h4>
+                <div id="sliderContainer1"></div>
+            </div>
+        </details>
+
+        <!-- Equation 2 -->
+        <details>
+            <summary>Equation 2</summary>
+            <div class="tooltip">
+                <label>
+                    <input type="checkbox" id="equation2" title="Toggle Equation 2 on or off">
+                    Equation 2
+                </label>
+            </div>
+            <div class="tooltip">
+                <label for="effect2">Effect:</label>
+                <select id="effect2" title="Select whether to add or subtract the equation's effect">
+                    <option value="add">Add</option>
+                    <option value="subtract">Subtract</option>
+                </select>
+            </div>
+            <div id="equation2Parameters" class="equation-parameters">
+                <h4>Equation 2 Parameters</h4>
+                <div id="sliderContainer2"></div>
+            </div>
+        </details>
+
+        <!-- Equation 3 -->
+        <details>
+            <summary>Equation 3</summary>
+            <div class="tooltip">
+                <label>
+                    <input type="checkbox" id="equation3" title="Toggle Equation 3 on or off">
+                    Equation 3
+                </label>
+            </div>
+            <div class="tooltip">
+                <label for="effect3">Effect:</label>
+                <select id="effect3" title="Select whether to add or subtract the equation's effect">
+                    <option value="add">Add</option>
+                    <option value="subtract">Subtract</option>
+                </select>
+            </div>
+            <div id="equation3Parameters" class="equation-parameters">
+                <h4>Equation 3 Parameters</h4>
+                <div id="sliderContainer3"></div>
+            </div>
+        </details>
+
+        <!-- Equation 4 -->
+        <details>
+            <summary>Equation 4</summary>
+            <div class="tooltip">
+                <label>
+                    <input type="checkbox" id="equation4" title="Toggle Equation 4 on or off">
+                    Equation 4
+                </label>
+            </div>
+            <div class="tooltip">
+                <label for="effect4">Effect:</label>
+                <select id="effect4" title="Select whether to add or subtract the equation's effect">
+                    <option value="add">Add</option>
+                    <option value="subtract">Subtract</option>
+                </select>
+            </div>
+            <div id="equation4Parameters" class="equation-parameters">
+                <h4>Equation 4 Parameters</h4>
+                <div id="sliderContainer4"></div>
+            </div>
+        </details>
+    </div>
+
+    <div id="displayPanel"></div>
+
+    <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        // Main Variables
+        let scene, camera, renderer, points, geometry, material;
+        let positions;
+        const POINT_COUNT = 100000;
+        const animationSpeeds = { equation1: 1, equation2: 1, equation3: 1, equation4: 1 };
+
+        let t1 = 0, t2 = 0, t3 = 0, t4 = 0; // Time variables for each equation
+
+        const effects = {
+            equation1: "add",
+            equation2: "add",
+            equation3: "add",
+            equation4: "add"
+        };
+
+        // Parameters for the equations
+        const param1 = {
+            offsetX: 0,
+            offsetY: -100,
+            kDiv: 8,
+            kSub: 12,
+            scaleFactor: 0.7,
+            xAmplitude: 20,
+            yAmplitude: 20,
+            speed: 1
+        };
+
+        const param2 = {
+            phaseFactor: 0.1,
+            xAmplitude: 20,
+            yAmplitude: 20,
+            speed: 1
+        };
+
+        const param3 = {
+            zAmplitude: 30,
+            frequency: 0.5,
+            speed: 1
+        };
+
+        const param4 = {
+            radialFactor: 0.5,
+            twistFactor: 2,
+            zWaveFrequency: 0.3,
+            zWaveAmplitude: 20,
+            speed: 1
+        };
+
+        const activeEquations = {
+            equation1: true,
+            equation2: false,
+            equation3: false,
+            equation4: false
+        };
+
+        // Initialize Scene and Camera
+        function initScene() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0000000);
+
+            camera = new THREE.PerspectiveCamera(
+                75,
+                window.innerWidth * 2 / 3 / window.innerHeight,
+                0.1,
+                2000
+            );
+            camera.position.set(0, 0, 500);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth * 2 / 3, window.innerHeight);
+            document.getElementById("displayPanel").appendChild(renderer.domElement);
+
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+        }
+
+        // Initialize Point Cloud
+        function initPointCloud() {
+            geometry = new THREE.BufferGeometry();
+            positions = new Float32Array(POINT_COUNT * 3);
+
+            for (let i = 0; i < POINT_COUNT; i++) {
+                const x = i % 200;
+                const y = Math.floor(i / 200);
+                const pos = calculatePoint(x, y, 0, 0, 0, 0);
+                positions[i * 3] = pos.x;
+                positions[i * 3 + 1] = pos.y;
+                positions[i * 3 + 2] = pos.z;
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+            material = new THREE.PointsMaterial({
+                color: 0xffffff,
+                size: 1
+            });
+
+            points = new THREE.Points(geometry, material);
+            scene.add(points);
+        }
+
+        // Equation Logic
+        function calculatePoint(x, y, t1, t2, t3, t4) {
+            let px = x;
+            let py = y;
+            let pz = 0;
+
+            function applyEffect(value, effect) {
+                return effect === "add" ? value : -value;
+            }
+
+            if (activeEquations.equation1) {
+                const k = x / param1.kDiv - param1.kSub;
+                const e = y / param1.kDiv - param1.kSub;
+                px += applyEffect(Math.sin(k + t1) * param1.xAmplitude, effects.equation1);
+                py += applyEffect(Math.cos(e + t1) * param1.yAmplitude, effects.equation1);
+            }
+
+            if (activeEquations.equation2) {
+                const k = x / 10;
+                const e = y / 10;
+                const phase = Math.sin(k + e * param2.phaseFactor + t2);
+                px += applyEffect(phase * param2.xAmplitude, effects.equation2);
+                py += applyEffect(phase * param2.yAmplitude, effects.equation2);
+            }
+
+            if (activeEquations.equation3) {
+                pz += applyEffect(Math.sin(t3 * param3.frequency + x * y / 10000) * param3.zAmplitude, effects.equation3);
+            }
+
+            if (activeEquations.equation4) {
+                const radius = Math.sqrt(x  + y * y);
+                const angle = Math.atan2(y, x) + param4.twistFactor * radius + t4 * param4.radialFactor;
+                px += applyEffect(radius * Math.cos(angle) - x, effects.equation4);
+                py += applyEffect(radius * Math.sin(angle) - y, effects.equation4);
+                pz += applyEffect(Math.sin(radius * param4.zWaveFrequency + t4) * param4.zWaveAmplitude, effects.equation4);
+            }
+
+            return { x: px, y: py, z: pz };
+        }
+
+        // Animation Loop
+        function animate() {
+            requestAnimationFrame(animate);
+            t1 += (Math.PI / 90) * animationSpeeds.equation1;
+            t2 += (Math.PI / 90) * animationSpeeds.equation2;
+            t3 += (Math.PI / 90) * animationSpeeds.equation3;
+            t4 += (Math.PI / 90) * animationSpeeds.equation4;
+
+            for (let i = 0; i < POINT_COUNT; i++) {
+                const x = i % 200;
+                const y = Math.floor(i / 200);
+                const pos = calculatePoint(x, y, t1, t2, t3, t4);
+                positions[i * 3] = pos.x;
+                positions[i * 3 + 1] = pos.y;
+                positions[i * 3 + 2] = pos.z;
+            }
+            geometry.attributes.position.needsUpdate = true;
+
+            renderer.render(scene, camera);
+        }
+
+        // Add Sliders Dynamically
+        function createSliders(containerId, paramObject, equationKey) {
+            const sliderContainer = document.getElementById(containerId);
+
+            function addSlider(labelText, propertyKey, min, max, step) {
+                const sliderDiv = document.createElement('div');
+                sliderDiv.className = 'slider';
+
+                const label = document.createElement('label');
+                label.textContent = `${labelText}: ${paramObject[propertyKey]}`;
+                label.setAttribute('title', `Adjust the ${labelText.toLowerCase()} for ${equationKey}`);
+
+                const range = document.createElement('input');
+                range.type = 'range';
+                range.min = min;
+                range.max = max;
+                range.step = step;
+                range.value = paramObject[propertyKey];
+                range.setAttribute('title', `Slide to change the ${labelText.toLowerCase()} for ${equationKey}`);
+
+                range.addEventListener('input', () => {
+                    if (propertyKey === 'speed') {
+                        animationSpeeds[equationKey] = parseFloat(range.value);
+                    } else {
+                        paramObject[propertyKey] = parseFloat(range.value);
+                    }
+                    label.textContent = `${labelText}: ${paramObject[propertyKey]}`;
+                });
+
+                sliderDiv.appendChild(label);
+                sliderDiv.appendChild(range);
+                sliderContainer.appendChild(sliderDiv);
+            }
+
+            Object.keys(paramObject).forEach(key => {
+                const sliderRange = key === 'speed' ? [0, 5] : [0, 40];
+                addSlider(key, key, sliderRange[0], sliderRange[1], 0.1);
+            });
+        }
+
+        // Handle Equation Toggles and Effects
+        document.getElementById('equation1').addEventListener('change', (e) => {
+            activeEquations.equation1 = e.target.checked;
+            document.getElementById('equation1Parameters').classList.toggle('active', e.target.checked);
+        });
+
+        document.getElementById('effect1').addEventListener('change', (e) => {
+            effects.equation1 = e.target.value;
+        });
+
+        document.getElementById('equation2').addEventListener('change', (e) => {
+            activeEquations.equation2 = e.target.checked;
+            document.getElementById('equation2Parameters').classList.toggle('active', e.target.checked);
+        });
+
+        document.getElementById('effect2').addEventListener('change', (e) => {
+            effects.equation2 = e.target.value;
+        });
+
+        document.getElementById('equation3').addEventListener('change', (e) => {
+            activeEquations.equation3 = e.target.checked;
+            document.getElementById('equation3Parameters').classList.toggle('active', e.target.checked);
+        });
+
+        document.getElementById('effect3').addEventListener('change', (e) => {
+            effects.equation3 = e.target.value;
+        });
+
+        document.getElementById('equation4').addEventListener('change', (e) => {
+            activeEquations.equation4 = e.target.checked;
+            document.getElementById('equation4Parameters').classList.toggle('active', e.target.checked);
+        });
+
+        document.getElementById('effect4').addEventListener('change', (e) => {
+            effects.equation4 = e.target.value;
+        });
+
+        // Main Execution Flow
+        initScene();
+        createSliders('sliderContainer1', param1, 'equation1');
+        createSliders('sliderContainer2', param2, 'equation2');
+        createSliders('sliderContainer3', param3, 'equation3');
+        createSliders('sliderContainer4', param4, 'equation4');
+        initPointCloud();
+        animate();
+    </script>
+</body>
+</html>
