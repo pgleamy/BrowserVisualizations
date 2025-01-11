@@ -5,81 +5,184 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JavaScript Visualizations and Games</title>
     <style>
+        /* CSS Variables for Enhanced Theme */
+        :root {
+            --bg-color: #121212;
+            --header-bg: #1f1f1f;
+            --accent-color: #ff4081; /* Vibrant pink */
+            --secondary-color: #00e5ff; /* Vibrant cyan */
+            --content-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --link-color: #82b1ff; /* Brighter link color */
+            --link-hover-color: #448aff;
+            --border-radius: 6px;
+            --transition-speed: 0.2s;
+            --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* Reset and Base Styles */
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            background-color: #121212;
-            color: #ffffff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-family);
             margin: 0;
             padding: 0;
-            line-height: 1.6;
+            line-height: 1.5;
         }
+
+        /* Header Styling */
         header {
-            background-color: #1e1e1e;
-            padding: 20px;
+            background: linear-gradient(135deg, var(--accent-color), var(--secondary-color));
+            padding: 10px 15px;
             text-align: center;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
         }
+
         header h1 {
             margin: 0;
-            font-size: 1.5em;
+            font-size: 1.6em;
+            font-weight: 700;
+            color: #ffffff;
         }
+
+        header h2 {
+            margin: 3px 0 0 0;
+            font-size: 1em;
+            font-weight: 400;
+            color: #b0b0b0;
+        }
+
+        /* Navigation Styling */
         nav {
-            background-color: #1e1e1e;
-            padding: 10px;
+            background-color: var(--header-bg);
+            padding: 8px 10px;
             text-align: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
         }
+
         nav a {
-            color: #1e90ff;
-            margin: 0 15px;
+            color: var(--link-color);
+            margin: 0 8px;
             text-decoration: none;
-            font-size: 0.8em;
+            font-size: 0.85em;
+            padding: 4px 6px;
+            border-radius: 4px;
+            transition: background-color var(--transition-speed), color var(--transition-speed);
         }
+
         nav a:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: var(--link-hover-color);
             text-decoration: underline;
         }
+
+        /* Container Styling */
         .container {
-            max-width: 800px;
-            margin: auto;
-            padding: 20px;
+            max-width: 900px;
+            margin: 15px auto;
+            padding: 10px 15px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
         }
+
+        /* Content Item Styling */
         .content-item {
-            margin-bottom: 20px;
-            padding: 10px;
-            background-color: #2c2c2c;
-            border-radius: 8px;
+            padding: 12px 15px;
+            background-color: var(--content-bg);
+            border-radius: var(--border-radius);
+            box-shadow: 0 1px 5px rgba(0, 0, 0, 0.5);
+            transition: transform var(--transition-speed), box-shadow var(--transition-speed);
         }
+
+        .content-item:hover {
+            transform: scale(1.02);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.8);
+        }
+
         .content-item h2 {
             margin-top: 0;
+            font-size: 1.2em;
+            font-weight: 600;
+            color: var(--accent-color);
         }
+
+        .content-item p {
+            margin: 8px 0;
+            font-size: 0.9em;
+            color: #cfcfcf;
+        }
+
         .content-item a {
-            color: #1e90ff;
+            color: var(--link-color);
+            text-decoration: underline;
+            font-weight: 500;
+            transition: color var(--transition-speed);
         }
+
         .content-item a:hover {
+            color: var(--link-hover-color);
             text-decoration: underline;
         }
+
+        /* Footer Styling */
         footer {
-            background-color: #1e1e1e;
-            padding: 20px;
+            background-color: var(--header-bg);
+            padding: 10px 15px;
             text-align: center;
-            font-size: 0.9em;
+            font-size: 0.75em;
+            color: #a0a0a0;
+            box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.6);
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 600px) {
+            nav a {
+                display: inline-block;
+                margin: 4px 4px;
+                padding: 6px 8px;
+                font-size: 0.8em;
+            }
+
+            .container {
+                padding: 8px 10px;
+                gap: 8px;
+            }
+
+            .content-item {
+                padding: 10px 12px;
+            }
+
+            header h1 {
+                font-size: 1.4em;
+            }
+
+            header h2 {
+                font-size: 0.9em;
+            }
         }
     </style>
 </head>
 <body>
     <header>
         <h1>Code Art</h1>
-	<h2>BOXED PANDORA</h2>
+    	<h2>BOXED PANDORA</h2>
     </header>
     <nav>
         <a href="#soundscape">SoundScape Music Visualizer</a>
-	<a href="#interactive-equations">Interactive Equations</a>
+    	<a href="#interactive-equations">Interactive Equations</a>
         <a href="#equation-explorer">Equation Explorer</a>	    
-	<a href="#solar-system">Solar System</a>
-	<a href="#flocking">Flocking Simulation</a>   
+    	<a href="#solar-system">Solar System</a>
+    	<a href="#flocking">Flocking Simulation</a>   
         <a href="#asteroids">ASTEROIDS</a>
         <a href="#force-directed-graph">Force Directed Graph</a>	
-	<a href="#pi-visualization">Pi Visualization</a>    
+    	<a href="#pi-visualization">Pi Visualization</a>    
         <a href="#wind-flyer">WIND FLYER</a>
-	<a href="#pong">Pong Clone (yah, I know)</a>
+    	<a href="#pong">Pong Clone (yah, I know)</a>
     </nav>
     <div class="container">
         <div id="soundscape" class="content-item">
@@ -127,13 +230,15 @@
             <p>Use the up/down arrow keys to avoid obstacles. The wind speed changes so pay attention!</p>
             <p><a href="https://pgleamy.github.io/BrowserVisualizations/WindFlyer.html" target="_blank">Play WIND FLYER Game</a></p>
         </div>
-	<div id="pong" class="content-item">
+    	<div id="pong" class="content-item">
             <h2>Pong Clone</h2>
             <p>Press any key starts game. Player 1 is A-Z, player 2 is K-M. Use on a computer.</p>
             <p><a href="https://pgleamy.github.io/BrowserVisualizations/Pong.html" target="_blank">Pong Clone</a></p>
         </div>
     </div>
     <footer>
+        &copy; 2025 Code Art. All rights reserved.
     </footer>
 </body>
 </html>
+
