@@ -130,8 +130,8 @@
             <div class="control-group">
                 <label for="colorScheme">Color Scheme:</label>
                 <select id="colorScheme">
-                    <option value="rainbow">Rainbow</option>
                     <option value="fire">Fire</option>
+                    <option value="rainbow">Rainbow</option>                    
                     <option value="ice">Ice</option>
                     <option value="earth">Earth</option>
                     <option value="sunset">Sunset</option>
@@ -675,8 +675,8 @@
             });
 
             // Handle Controls
-            let sensitivity = 1.0;
-            let colorScheme = 'rainbow';
+            let sensitivity = 1.2;
+            let colorScheme = 'fire';
             document.getElementById('sensitivity').addEventListener('input', (e) => {
                 sensitivity = parseFloat(e.target.value);
                 document.getElementById('sensitivityValue').textContent = sensitivity.toFixed(2);
