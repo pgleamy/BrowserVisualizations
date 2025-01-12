@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Soundscape</title>
+    <style>
+        /* Reset default margins and paddings */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Flex container for the entire page */
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            color: #fff;
+            background-color: #000;
+        }
+
+        .container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Controls Sidebar */
+
+        #controls {
+            width: 100px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 10px;
+            overflow-y: auto;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+            position: absolute;
+            left: 0; /* Keep it docked to the left side */
+            top: 0;
+            height: 100%; /* Full height for consistent positioning */
+            z-index: 10; /* Ensure it is above other elements */
+        }
+
+        #controls.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        #controls h2 {
+            margin-bottom: 15px;
+            font-size: 10px;
+            text-align: center;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 8px;
+            margin-bottom: 2px;
+        }
+
+        .control-group input[type="range"],
+        .control-group select {
+            width: 100%;
+        }
+
+        #startButton {
+            width: 100%;
+            padding: 5px;
+            background: #28a745;
+            border: none;
+            border-radius: 5px;
+            color: #fff;
+            font-size: 10px;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-bottom: 10px;
+        }
+
+        #startButton:hover {
+            background: #218838;
+        }
+
+        #status {
+            font-size: 10px;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        /* Visualization Area */
+        #visualization {
+            flex: 1; /* Take up remaining space */
+            position: relative;
+            background-color: #000;
+        }
+
+        /* FPS Counter */
+        /* Removed: #fpsCounter { ... } */
+
+        body {
+            cursor: default; /* Default cursor */
+        }
+
+        #visualization.hidden-cursor {
+            cursor: none; /* Hide the cursor */
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Controls Sidebar -->
+        <div id="controls">
+            <h2>SOUNDSCAPE</h2>
+            <button id="startButton">Start</button>
+            <div id="status">Click "Start Visualization" to begin.</div>
+            <div class="control-group">
+                <label for="sensitivity">Sensitivity: <span id="sensitivityValue">2.00</span></label>
+                <input type="range" id="sensitivity" min="0.1" max="5" step="0.1" value="2">
+            </div>
+            <div class="control-group">
+                <label for="colorScheme">Color Scheme:</label>
+                <select id="colorScheme">
+		    <option value="fire">Fire</option>
+                    <option value="rainbow">Rainbow</option>
+                    <option value="ice">Ice</option>
+                    <option value="earth">Earth</option>
+                    <option value="sunset">Sunset</option>
+                    <option value="forest">Forest</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Visualization Area -->
+        <div id="visualization">
+            <canvas id="glCanvas"></canvas>
+            <!-- Removed: <div id="fpsCounter"></div> -->
+        </div>
+    </div>
+
+    <script>
+        const controls = document.getElementById('controls');
+
+        document.addEventListener('mousemove', (event) => {
+            const rect = controls.getBoundingClientRect();
+            if (
+                event.clientX >= rect.left &&
+                event.clientX <= rect.right &&
+                event.clientY >= rect.top &&
+                event.clientY <= rect.bottom
+            ) {
+                controls.classList.add('show');
+            } else {
+                controls.classList.remove('show');
+            }
+        });
+    </script>
+
+    <script>
+        visualization = document.getElementById('visualization');
+
+        document.addEventListener('mousemove', (event) => {
+            const controlsRect = controls.getBoundingClientRect();
+            const visualizationRect = visualization.getBoundingClientRect();
+
+            const isOverControls =
+                event.clientX >= controlsRect.left &&
+                event.clientX <= controlsRect.right &&
+                event.clientY >= controlsRect.top &&
+                event.clientY <= controlsRect.bottom;
+
+            const isOverVisualization =
+                event.clientX >= visualizationRect.left &&
+                event.clientX <= visualizationRect.right &&
+                event.clientY >= visualizationRect.top &&
+                event.clientY <= visualizationRect.bottom;
+
+            if (isOverVisualization && !isOverControls) {
+                visualization.classList.add('hidden-cursor'); // Hide cursor
+            } else {
+                visualization.classList.remove('hidden-cursor'); // Show cursor
+            }
+        });
+    </script>
+
+    <script>
+        // ----------------------------
+        // WebGL Initialization and Utilities
+        // ----------------------------
+
+        // Vertex Shader Source
+        const vertexShaderSource = `
+            attribute vec3 aPosition;
+            attribute vec3 aColor;
+            uniform mat4 uProjectionMatrix;
+            uniform mat4 uViewMatrix;
+            varying vec3 vColor;
+            void main(void) {
+                gl_Position = uProjectionMatrix * uViewMatrix * vec4(aPosition, 1.0);
+                vColor = aColor;
+            }
+        `;
+
+        // Fragment Shader Source
+        const fragmentShaderSource = `
+            precision mediump float;
+            varying vec3 vColor;
+            void main(void) {
+                gl_FragColor = vec4(vColor, 1.0);
+            }
+        `;
+
+        // Function to compile shader
+        function compileShader(gl, shaderSource, shaderType) {
+            const shader = gl.createShader(shaderType);
+            gl.shaderSource(shader, shaderSource);
+            gl.compileShader(shader);
+
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                const info = gl.getShaderInfoLog(shader);
+                console.error('Could not compile WebGL shader. \n\n' + info);
+                gl.deleteShader(shader);
+                return null;
+            }
+            return shader;
+        }
+
+        // Function to create shader program
+        function createShaderProgram(gl, vertexSource, fragmentSource) {
+            const vertexShader = compileShader(gl, vertexSource, gl.VERTEX_SHADER);
+            const fragmentShader = compileShader(gl, fragmentSource, gl.FRAGMENT_SHADER);
+
+            const shaderProgram = gl.createProgram();
+            gl.attachShader(shaderProgram, vertexShader);
+            gl.attachShader(shaderProgram, fragmentShader);
+            gl.linkProgram(shaderProgram);
+
+            if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+                const info = gl.getProgramInfoLog(shaderProgram);
+                console.error('Could not link WebGL program. \n\n' + info);
+                gl.deleteProgram(shaderProgram);
+                return null;
+            }
+            return shaderProgram;
+        }
+
+        // Function to create a sphere's vertices
+        function createWireframeSphere(radius, latitudeBands, longitudeBands) {
+            const positions = [];
+            const indices = [];
+
+            for (let latNumber = 0; latNumber <= latitudeBands; latNumber++) {
+                const theta = latNumber * Math.PI / latitudeBands;
+                const sinTheta = Math.sin(theta);
+                const cosTheta = Math.cos(theta);
+
+                for (let longNumber = 0; longNumber <= longitudeBands; longNumber++) {
+                    const phi = longNumber * 2 * Math.PI / longitudeBands;
+                    const sinPhi = Math.sin(phi);
+                    const cosPhi = Math.cos(phi);
+
+                    const x = cosPhi * sinTheta;
+                    const y = cosTheta;
+                    const z = sinPhi * sinTheta;
+                    positions.push(x * radius, y * radius, z * radius);
+                }
+            }
+
+            for (let latNumber = 0; latNumber < latitudeBands; latNumber++) {
+                for (let longNumber = 0; longNumber < longitudeBands; longNumber++) {
+                    const first = (latNumber * (longitudeBands + 1)) + longNumber;
+                    const second = first + longitudeBands + 1;
+
+                    // Lines between vertices
+                    indices.push(first, second);
+                    indices.push(first, first + 1);
+                }
+            }
+
+            return { positions: positions, indices: indices };
+        }
+
+        // Function to distribute points uniformly on a sphere from bottom to top
+        function distributePointsOnSphere(numPoints, radius) {
+            const points = [];
+            const angleIncrement = 2 * Math.PI * ((1 + Math.sqrt(5)) / 2); // Golden angle
+
+            for (let i = 0; i < numPoints; i++) {
+                const t = i / (numPoints - 1);
+                const y = -1 + 2 * t; // y from -1 (bottom) to +1 (top)
+                const radiusAtY = Math.sqrt(1 - y * y);
+                const phi = angleIncrement * i;
+
+                const x = radiusAtY * Math.cos(phi);
+                const z = radiusAtY * Math.sin(phi);
+
+                points.push([x, y, z]);
+            }
+            return points;
+        }
+
+        // Function to handle camera transformations
+        class Camera {
+            constructor(gl, canvas) {
+                this.gl = gl;
+                this.canvas = canvas;
+                this.projectionMatrix = mat4.create();
+                this.viewMatrix = mat4.create();
+                this.modelMatrix = mat4.create();
+                mat4.identity(this.modelMatrix);
+
+                // Camera parameters
+                this.distance = 5;
+                this.rotation = [0, 0]; // [theta, phi]
+                this.pan = [0, 0];
+                this.zoom = 1.0;
+
+                // Mouse interaction state
+                this.isOrbiting = false;
+                this.isPanning = false;
+                this.lastMousePos = { x: 0, y: 0 };
+
+                // Setup event listeners
+                this.setupEventListeners();
+                this.updateViewMatrix();
+            }
+
+            setupEventListeners() {
+                this.canvas.addEventListener('mousedown', (e) => {
+                    if (e.button === 0) { // Left button
+                        this.isOrbiting = true;
+                    } else if (e.button === 2) { // Right button
+                        this.isPanning = true;
+                    }
+                    this.lastMousePos = { x: e.clientX, y: e.clientY };
+                });
+
+                this.canvas.addEventListener('mousemove', (e) => {
+                    const dx = e.clientX - this.lastMousePos.x;
+                    const dy = e.clientY - this.lastMousePos.y;
+
+                    if (this.isOrbiting) {
+                        this.rotation[0] += dx * 0.005;
+                        this.rotation[1] += dy * 0.005;
+                        this.rotation[1] = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.rotation[1]));
+                    }
+
+                    if (this.isPanning) {
+                        this.pan[0] += dx * 0.01;
+                        this.pan[1] -= dy * 0.01;
+                    }
+
+                    this.lastMousePos = { x: e.clientX, y: e.clientY };
+                    this.updateViewMatrix();
+                });
+
+                this.canvas.addEventListener('mouseup', (e) => {
+                    if (e.button === 0) {
+                        this.isOrbiting = false;
+                    } else if (e.button === 2) {
+                        this.isPanning = false;
+                    }
+                });
+
+                this.canvas.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    this.distance += e.deltaY * 0.01;
+                    this.distance = Math.max(2, Math.min(50, this.distance));
+                    this.updateViewMatrix();
+                });
+
+                // Prevent context menu on right-click
+                this.canvas.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                });
+            }
+
+            updateViewMatrix() {
+                const theta = this.rotation[0];
+                const phi = this.rotation[1];
+
+                const x = this.distance * Math.cos(phi) * Math.sin(theta);
+                const y = this.distance * Math.sin(phi);
+                const z = this.distance * Math.cos(phi) * Math.cos(theta);
+
+                const eye = [x + this.pan[0], y + this.pan[1], z];
+                const center = [this.pan[0], this.pan[1], 0];
+                const up = [0, 1, 0];
+
+                mat4.lookAt(this.viewMatrix, eye, center, up);
+            }
+
+            getViewMatrix() {
+                return this.viewMatrix;
+            }
+
+            getProjectionMatrix(aspect) {
+                mat4.perspective(this.projectionMatrix, 45 * Math.PI / 180, aspect, 0.1, 1000.0);
+                return this.projectionMatrix;
+            }
+        }
+
+        // ----------------------------
+        // Matrix Utility Functions
+        // ----------------------------
+
+        // Simple implementation of mat4 using glMatrix library-like functions
+        const mat4 = {
+            create: function() {
+                return new Float32Array(16);
+            },
+            identity: function(out) {
+                out[0] = 1; out[1] = 0; out[2] = 0; out[3] = 0;
+                out[4] = 0; out[5] = 1; out[6] = 0; out[7] = 0;
+                out[8] = 0; out[9] = 0; out[10] = 1; out[11] = 0;
+                out[12] = 0; out[13] = 0; out[14] = 0; out[15] = 1;
+                return out;
+            },
+            perspective: function(out, fovy, aspect, near, far) {
+                const f = 1.0 / Math.tan(fovy / 2);
+                const nf = 1 / (near - far);
+                out[0] = f / aspect;
+                out[1] = 0;
+                out[2] = 0;
+                out[3] = 0;
+
+                out[4] = 0;
+                out[5] = f;
+                out[6] = 0;
+                out[7] = 0;
+
+                out[8] = 0;
+                out[9] = 0;
+                out[10] = (far + near) * nf;
+                out[11] = -1;
+
+                out[12] = 0;
+                out[13] = 0;
+                out[14] = (2 * far * near) * nf;
+                out[15] = 0;
+                return out;
+            },
+            lookAt: function(out, eye, center, up) {
+                let x0, x1, x2, y0, y1, y2, z0, z1, z2, len;
+                let eyex = eye[0],
+                    eyey = eye[1],
+                    eyez = eye[2];
+                let upx = up[0],
+                    upy = up[1],
+                    upz = up[2];
+                let centerx = center[0],
+                    centery = center[1],
+                    centerz = center[2];
+
+                if (
+                    Math.abs(eyex - centerx) < 0.000001 &&
+                    Math.abs(eyey - centery) < 0.000001 &&
+                    Math.abs(eyez - centerz) < 0.000001
+                ) {
+                    return this.identity(out);
+                }
+
+                z0 = eyex - centerx;
+                z1 = eyey - centery;
+                z2 = eyez - centerz;
+
+                len = z0 * z0 + z1 * z1 + z2 * z2;
+                if (len === 0) {
+                    z0 = 0;
+                    z1 = 0;
+                    z2 = 1;
+                } else {
+                    len = 1 / Math.sqrt(len);
+                    z0 *= len;
+                    z1 *= len;
+                    z2 *= len;
+                }
+
+                x0 = upy * z2 - upz * z1;
+                x1 = upz * z0 - upx * z2;
+                x2 = upx * z1 - upy * z0;
+                len = x0 * x0 + x1 * x1 + x2 * x2;
+                if (len === 0) {
+                    x0 = 0;
+                    x1 = 0;
+                    x2 = 0;
+                } else {
+                    len = 1 / Math.sqrt(len);
+                    x0 *= len;
+                    x1 *= len;
+                    x2 *= len;
+                }
+
+                y0 = z1 * x2 - z2 * x1;
+                y1 = z2 * x0 - z0 * x2;
+                y2 = z0 * x1 - z1 * x0;
+
+                len = y0 * y0 + y1 * y1 + y2 * y2;
+                if (len === 0) {
+                    y0 = 0;
+                    y1 = 0;
+                    y2 = 0;
+                } else {
+                    len = 1 / Math.sqrt(len);
+                    y0 *= len;
+                    y1 *= len;
+                    y2 *= len;
+                }
+
+                out[0] = x0;
+                out[1] = y0;
+                out[2] = z0;
+                out[3] = 0;
+                out[4] = x1;
+                out[5] = y1;
+                out[6] = z1;
+                out[7] = 0;
+                out[8] = x2;
+                out[9] = y2;
+                out[10] = z2;
+                out[11] = 0;
+                out[12] = -(x0 * eyex + x1 * eyey + x2 * eyez);
+                out[13] = -(y0 * eyex + y1 * eyey + y2 * eyez);
+                out[14] = -(z0 * eyex + z1 * eyey + z2 * eyez);
+                out[15] = 1;
+
+                return out;
+            }
+        };
+
+        // ----------------------------
+        // FPS Counter Implementation
+        // ----------------------------
+        /* Removed: 
+        class FPSCounter {
+            constructor(elementId) {
+                this.element = document.getElementById(elementId);
+                this.lastTime = performance.now();
+                this.frameCount = 0;
+                this.fps = 0;
+            }
+
+            update() {
+                const now = performance.now();
+                this.frameCount++;
+                const delta = now - this.lastTime;
+
+                if (delta >= 1000) {
+                    this.fps = (this.frameCount / delta) * 1000;
+                    this.element.textContent = `// FPS: ${this.fps.toFixed(1)}`;
+                    this.frameCount = 0;
+                    this.lastTime = now;
+                }
+            }
+        }
+        */
+
+        // ----------------------------
+        // Main Application
+        // ----------------------------
+        window.onload = function() {
+            const canvas = document.getElementById('glCanvas');
+            const gl = canvas.getContext('webgl');
+            if (!gl) {
+                alert('WebGL not supported in your browser.');
+                return;
+            }
+
+            // Create shader program
+            const shaderProgram = createShaderProgram(gl, vertexShaderSource, fragmentShaderSource);
+            gl.useProgram(shaderProgram);
+
+            // Get attribute and uniform locations
+            const aPositionLoc = gl.getAttribLocation(shaderProgram, 'aPosition');
+            const aColorLoc = gl.getAttribLocation(shaderProgram, 'aColor');
+            const uProjectionMatrixLoc = gl.getUniformLocation(shaderProgram, 'uProjectionMatrix');
+            const uViewMatrixLoc = gl.getUniformLocation(shaderProgram, 'uViewMatrix');
+
+            // Define a constant for the number of frequency lines
+            const NUM_FREQUENCY_LINES = 440;
+
+            // Removed: Create inner and outer spheres
+            /*
+            // Create inner sphere
+            const innerSphereData = createWireframeSphere(0.2, 32, 32);
+            const innerPositionBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, innerPositionBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(innerSphereData.positions), gl.STATIC_DRAW);
+
+            const innerIndexBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, innerIndexBuffer);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(innerSphereData.indices), gl.STATIC_DRAW);
+
+            // Create outer wireframe sphere
+            const outerSphereData = createWireframeSphere(1.5, 128, 128); // High resolution
+            const outerPositionBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, outerPositionBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(outerSphereData.positions), gl.STATIC_DRAW);
+
+            const outerIndexBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, outerIndexBuffer);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(outerSphereData.indices), gl.STATIC_DRAW);
+            */
+
+            // Distribute frequency points (unit vectors) from bottom to top
+            const frequencyPoints = distributePointsOnSphere(NUM_FREQUENCY_LINES, 1.5);
+
+            // Create frequency lines buffer
+            const freqLinePositions = new Float32Array(NUM_FREQUENCY_LINES * 2 * 3); // Each line has 2 points, each point has x,y,z
+            const freqLineColors = new Float32Array(NUM_FREQUENCY_LINES * 2 * 3); // RGB for each vertex
+
+            // Initialize frequency lines at origin
+            for (let i = 0; i < NUM_FREQUENCY_LINES; i++) {
+                // Start point at origin
+                freqLinePositions[i * 6] = 0;
+                freqLinePositions[i * 6 + 1] = 0;
+                freqLinePositions[i * 6 + 2] = 0;
+
+                // End point initially at origin (scale=0)
+                freqLinePositions[i * 6 + 3] = 0;
+                freqLinePositions[i * 6 + 4] = 0;
+                freqLinePositions[i * 6 + 5] = 0;
+
+                // Initial color (white)
+                freqLineColors[i * 6] = 1.0;
+                freqLineColors[i * 6 + 1] = 1.0;
+                freqLineColors[i * 6 + 2] = 1.0;
+                freqLineColors[i * 6 + 3] = 1.0;
+                freqLineColors[i * 6 + 4] = 1.0;
+                freqLineColors[i * 6 + 5] = 1.0;
+            }
+
+            // Create and allocate buffers for frequency lines
+            const freqLineBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, freqLineBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, freqLinePositions, gl.DYNAMIC_DRAW); 
+
+            const freqColorBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, freqColorBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, freqLineColors, gl.DYNAMIC_DRAW);
+
+            // Removed: Create color buffers for spheres
+            /*
+            // Create color buffers for spheres (all black to make them invisible)
+            const sphereColor = [0.0, 0.0, 0.0]; // Black color
+            const sphereColors = new Float32Array((innerSphereData.positions.length / 3) * 3).fill(sphereColor[0], 0, (innerSphereData.positions.length / 3) * 3);
+            const innerColorBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, innerColorBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, sphereColors, gl.STATIC_DRAW);
+
+            const outerColorBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, outerColorBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, sphereColors, gl.STATIC_DRAW); // Reuse the same color for outer sphere
+            */
+
+            // Removed: Create FPS counter
+            /* const fpsCounter = new FPSCounter('fpsCounter'); */
+
+            // Initialize camera
+            const cameraObj = new Camera(gl, canvas);
+
+            // Handle Start Button
+            document.getElementById('startButton').addEventListener('click', () => {
+                initAudio();
+                document.getElementById('startButton').disabled = true;
+            });
+
+            // Handle Controls
+            let sensitivity = 2.0;
+            let colorScheme = 'fire';
+            document.getElementById('sensitivity').addEventListener('input', (e) => {
+                sensitivity = parseFloat(e.target.value);
+                document.getElementById('sensitivityValue').textContent = sensitivity.toFixed(2);
+            });
+
+            document.getElementById('colorScheme').addEventListener('change', (e) => {
+                colorScheme = e.target.value;
+            });
+
+            // ----------------------------
+            // Audio Handling
+            // ----------------------------
+            async function initAudio() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const source = audioContext.createMediaStreamSource(stream);
+                    const analyser = audioContext.createAnalyser();
+                    analyser.fftSize = 2048;
+                    const bufferLength = analyser.frequencyBinCount;
+                    const dataArray = new Uint8Array(bufferLength);
+                    source.connect(analyser);
+
+                    document.getElementById('status').textContent = 'Visualization running...';
+
+                    // Initialize canvas size
+                    resizeCanvas();
+
+                    // Initialize per-line current scales
+                    const currentScales = new Float32Array(NUM_FREQUENCY_LINES).fill(0);
+
+                    function renderFrame() {
+                        /* Removed: fpsCounter.update(); */
+
+                        analyser.getByteFrequencyData(dataArray);
+
+                        // Update frequency lines based on audio data
+                        for (let i = 0; i < NUM_FREQUENCY_LINES; i++) {
+                            const amplitude = dataArray[i] / 255 * sensitivity;
+                            const targetScale = amplitude * 1.5; // Adjust scaling factor as needed
+
+                            // Update current scale towards target scale
+                            if (targetScale > currentScales[i]) {
+                                // Increase scale at normal rate
+                                currentScales[i] += (targetScale - currentScales[i]) * 0.08;
+                            } else {
+                                // Decrease scale smoothly
+                                currentScales[i] += (targetScale - currentScales[i]) * 2; // Adjusted for smoother decrease
+                            }
+
+                            // Calculate new end point
+                            const direction = frequencyPoints[i];
+                            const newEnd = [
+                                direction[0] * currentScales[i],
+                                direction[1] * currentScales[i],
+                                direction[2] * currentScales[i]
+                            ];
+
+                            freqLinePositions[i * 6 + 3] = newEnd[0];
+                            freqLinePositions[i * 6 + 4] = newEnd[1];
+                            freqLinePositions[i * 6 + 5] = newEnd[2];
+
+                            // Update color based on scheme
+                            const color = getColorForZone(i, amplitude, colorScheme);
+                            freqLineColors[i * 6] = color[0];
+                            freqLineColors[i * 6 + 1] = color[1];
+                            freqLineColors[i * 6 + 2] = color[2];
+                            freqLineColors[i * 6 + 3] = color[0];
+                            freqLineColors[i * 6 + 4] = color[1];
+                            freqLineColors[i * 6 + 5] = color[2];
+                        }
+
+                        // Update frequency lines buffer using bufferSubData for better performance
+                        gl.bindBuffer(gl.ARRAY_BUFFER, freqLineBuffer);
+                        gl.bufferSubData(gl.ARRAY_BUFFER, 0, freqLinePositions);
+
+                        gl.bindBuffer(gl.ARRAY_BUFFER, freqColorBuffer);
+                        gl.bufferSubData(gl.ARRAY_BUFFER, 0, freqLineColors);
+
+                        // Clear the canvas
+                        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+                        gl.enable(gl.DEPTH_TEST);
+                        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+
+                        // Removed: Draw Inner Sphere
+
+                        // Removed: Draw Outer Wireframe Sphere
+
+                        // Draw Frequency Lines
+                        gl.lineWidth(3.0); // Set line width to be thicker
+
+                        gl.bindBuffer(gl.ARRAY_BUFFER, freqLineBuffer);
+                        gl.enableVertexAttribArray(aPositionLoc);
+                        gl.vertexAttribPointer(aPositionLoc, 3, gl.FLOAT, false, 0, 0);
+
+                        gl.bindBuffer(gl.ARRAY_BUFFER, freqColorBuffer);
+                        gl.enableVertexAttribArray(aColorLoc);
+                        gl.vertexAttribPointer(aColorLoc, 3, gl.FLOAT, false, 0, 0);
+
+                        gl.uniformMatrix4fv(uProjectionMatrixLoc, false, cameraObj.getProjectionMatrix(gl.drawingBufferWidth / gl.drawingBufferHeight));
+                        gl.uniformMatrix4fv(uViewMatrixLoc, false, cameraObj.getViewMatrix());
+
+                        gl.drawArrays(gl.LINES, 0, NUM_FREQUENCY_LINES * 2); // 440 lines * 2 vertices each
+
+                        requestAnimationFrame(renderFrame);
+                    }
+
+                    renderFrame();
+                } catch (err) {
+                    console.error('Error accessing audio:', err);
+                    alert('Microphone access denied or "Stereo Mix" not enabled.');
+                    document.getElementById('status').textContent = 'Audio access denied.';
+                }
+            }
+
+            // ----------------------------
+            // Get Color for Frequency Zone
+            // ----------------------------
+            function getColorForZone(index, amplitude, colorScheme) {
+                let r = 1.0, g = 1.0, b = 1.0; // Default white
+
+                switch(colorScheme) {
+                    case 'rainbow':
+                        const hue = index / 440;
+                        const saturation = 1.0;
+                        const lightness = 0.5;
+                        [r, g, b] = hslToRgb(hue, saturation, lightness);
+                        break;
+                    case 'fire':
+                        r = amplitude;
+                        g = amplitude * 0.5;
+                        b = 0.0;
+                        break;
+                    case 'ice':
+                        r = 0.0;
+                        g = amplitude * 0.5;
+                        b = amplitude;
+                        break;
+                    case 'earth':
+                        r = amplitude * 0.5;
+                        g = amplitude;
+                        b = 0.0;
+                        break;
+                    case 'sunset':
+                        r = amplitude * 1.0;
+                        g = amplitude * 0.6;
+                        b = amplitude * 0.2;
+                        break;
+                    case 'forest':
+                        r = amplitude * 0.2;
+                        g = amplitude * 1.0;
+                        b = amplitude * 0.2;
+                        break;
+                    default:
+                        r = 1.0;
+                        g = 1.0;
+                        b = 1.0;
+                }
+
+                return [r, g, b];
+            }
+
+            // Function to convert HSL to RGB
+            function hslToRgb(h, s, l){
+                let r, g, b;
+
+                if(s == 0){
+                    r = g = b = l; // achromatic
+                }
+                else{
+                    const hue2rgb = function hue2rgb(p, q, t){
+                        if(t < 0) t += 1;
+                        if(t > 1) t -= 1;
+                        if(t < 1/6) return p + (q - p) * 6 * t;
+                        if(t < 1/2) return q;
+                        if(t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                        return p;
+                    }
+
+                    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                    const p = 2 * l - q;
+                    r = hue2rgb(p, q, h + 1/3);
+                    g = hue2rgb(p, q, h);
+                    b = hue2rgb(p, q, h - 1/3);
+                }
+
+                return [r, g, b];
+            }
+
+
+            // ----------------------------
+            // Handle Window Resize
+            // ----------------------------
+            function resizeCanvas() {
+                const visualization = document.getElementById('visualization');
+                canvas.width = visualization.clientWidth;
+                canvas.height = visualization.clientHeight;
+                gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+                const aspect = canvas.width / canvas.height;
+                const projectionMatrix = cameraObj.getProjectionMatrix(aspect);
+                gl.useProgram(shaderProgram); // Ensure the correct program is active
+                gl.uniformMatrix4fv(uProjectionMatrixLoc, false, projectionMatrix);
+            }
+            window.addEventListener('resize', resizeCanvas);
+        };
+    </script>
+</body>
+</html>
+
+
