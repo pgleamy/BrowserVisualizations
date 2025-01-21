@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebGL Swiss Watch with Pan and Zoom</title>
+    <style>
+        body { margin: 0; background: #000; }
+        canvas { 
+            display: block; 
+            width: 100vw; 
+            height: 100vh; 
+            cursor: grab; 
+            touch-action: none; /* Prevent default touch actions */
+        }
+        canvas:active { cursor: grabbing; }
+    </style>
+</head>
+<body>
+    <canvas id="glCanvas"></canvas>
+
+<script>
+// Initialize WebGL context
+const canvas = document.querySelector("#glCanvas");
+const gl = canvas.getContext("webgl", { antialias: true });
+
+if (!gl) {
+    alert("Unable to initialize WebGL");
+}
+
+// Vertex Shader Source
+const vertexShaderSource = `
+    attribute vec4 a_position;
+    attribute vec4 a_color;
+    uniform mat4 u_matrix;
+    uniform float u_rotation;
+    varying vec4 v_color;
+    
+    void main() {
+        float c = cos(u_rotation);
+        float s = sin(u_rotation);
+        mat4 rotationMatrix = mat4(
+            c, -s, 0, 0,
+            s, c, 0, 0,
+            0, 0, -1, 0,  // Flip Z axis
+            0, 0, 0, 1
+        );
+        gl_Position = u_matrix * rotationMatrix * a_position;
+        v_color = a_color;
+    }
+`;
+
+// Fragment Shader Source
+const fragmentShaderSource = `
+    precision mediump float;
+    varying vec4 v_color;
+    void main() {
+        gl_FragColor = v_color;
+    }
+`;
+
+// Function to Compile Shaders
+function createShader(gl, type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error("Shader compilation failed:", gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+    }
+    return shader;
+}
+
+// Function to Link Shaders into a Program
+function createProgram(gl, vertexShader, fragmentShader) {
+    const program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error("Program linking failed:", gl.getProgramInfoLog(program));
+        gl.deleteProgram(program);
+        return null;
+    }
+    return program;
+}
+
+// Compile Shaders and Link Program
+const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
+const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
+const program = createProgram(gl, vertexShader, fragmentShader);
+
+// Locate Attributes and Uniforms in the Shader Program
+const positionLocation = gl.getAttribLocation(program, "a_position");
+const colorLocation = gl.getAttribLocation(program, "a_color");
+const matrixLocation = gl.getUniformLocation(program, "u_matrix");
+const rotationLocation = gl.getUniformLocation(program, "u_rotation");
+
+// Function to Create a Watch Hand with Tapered Shape
+function createHand(length, baseWidth, tipWidth, color) {
+    // Define positions for two triangles forming a tapered rectangle
+    const positions = [
+        -baseWidth / 2, 0,          // Base Left
+         baseWidth / 2, 0,          // Base Right
+         tipWidth / 2, length,      // Tip Right
+
+        -baseWidth / 2, 0,          // Base Left
+         tipWidth / 2, length,      // Tip Right
+        -tipWidth / 2, length       // Tip Left
+    ];
+    
+    // Define colors for each vertex (RGBA)
+    const colors = [
+        color[0], color[1], color[2], 1.0,   // Base Left
+        color[0], color[1], color[2], 1.0,   // Base Right
+        color[0], color[1], color[2], 1.0,   // Tip Right
+
+        color[0], color[1], color[2], 1.0,   // Base Left
+        color[0], color[1], color[2], 1.0,   // Tip Right
+        color[0], color[1], color[2], 1.0    // Tip Left
+    ];
+    
+    // Create and bind position buffer
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+    
+    // Create and bind color buffer
+    const colorBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+    
+    return {
+        position: positionBuffer,
+        color: colorBuffer,
+        vertexCount: 6 // Two triangles
+    };
+}
+
+// Function to Create Hour and Minute Markers
+function createMarkers() {
+    const positions = [];
+    const colors = [];
+    
+    for (let i = 0; i < 60; i++) {
+        const angle = (i * Math.PI * 2) / 60;
+        const isHourMarker = i % 5 === 0;
+        
+        const innerRadius = isHourMarker ? 0.75 : 0.85;
+        const outerRadius = 0.9;
+        
+        positions.push(
+            Math.cos(angle) * innerRadius,
+            Math.sin(angle) * innerRadius,
+            Math.cos(angle) * outerRadius,
+            Math.sin(angle) * outerRadius
+        );
+        
+        const color = isHourMarker ? 0.1 : 0.3;
+        colors.push(
+            color, color, color, 1.0,
+            color, color, color, 1.0
+        );
+    }
+    
+    // Create and bind position buffer
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+    
+    // Create and bind color buffer
+    const colorBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+    
+    return {
+        position: positionBuffer,
+        color: colorBuffer,
+        vertexCount: positions.length / 2
+    };
+}
+
+// Function to Create a White Circular Watch Face
+function createCircle(radius, color, numSegments = 100) {
+    const positions = [0, 0]; // Center
+    const colors = [color[0], color[1], color[2], 1.0]; // Center color
+    
+    for (let i = 0; i <= numSegments; i++) {
+        const angle = i * 2 * Math.PI / numSegments;
+        positions.push(Math.cos(angle) * radius);
+        positions.push(Math.sin(angle) * radius);
+        colors.push(color[0], color[1], color[2], 1.0);
+    }
+    
+    // Create and bind position buffer
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+    
+    // Create and bind color buffer
+    const colorBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+    
+    return {
+        position: positionBuffer,
+        color: colorBuffer,
+        vertexCount: positions.length / 2
+    };
+}
+
+// Function to Create an Identity Matrix
+function createMatrix() {
+    return new Float32Array([
+        1, 0, 0, 0,  // Column 0
+        0, 1, 0, 0,  // Column 1
+        0, 0, 1, 0,  // Column 2
+        0, 0, 0, 1   // Column 3
+    ]);
+}
+
+// Function to Apply Scaling to the Matrix
+function scale(matrix, sx, sy) {
+    const scaledMatrix = new Float32Array(matrix);
+    scaledMatrix[0] *= sx;
+    scaledMatrix[1] *= sx;
+    scaledMatrix[4] *= sy;
+    scaledMatrix[5] *= sy;
+    return scaledMatrix;
+}
+
+// Function to Apply Translation to the Matrix
+function translate(matrix, tx, ty) {
+    const translatedMatrix = new Float32Array(matrix);
+    translatedMatrix[12] += tx;
+    translatedMatrix[13] += ty;
+    return translatedMatrix;
+}
+
+// Initialize Markers, Hands, and Circle
+const markers = createMarkers();
+const hourHand = createHand(0.4, 0.05, 0.02, [0, 0, 0]);      // Hour Hand: shorter and wider
+const minuteHand = createHand(0.6, 0.03, 0.015, [0, 0, 0]);    // Minute Hand: longer and thinner
+const secondHand = createHand(0.8, 0.005, 0.0025, [1, 0, 0]);   // Second Hand: very thin and long
+const circle = createCircle(1.0, [1, 1, 1], 100);        // White circle with 100 segments
+
+// Function to Draw Lines (Markers)
+function drawLines(object, rotation = 0) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, object.position);
+    gl.enableVertexAttribArray(positionLocation);
+    gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+    
+    gl.bindBuffer(gl.ARRAY_BUFFER, object.color);
+    gl.enableVertexAttribArray(colorLocation);
+    gl.vertexAttribPointer(colorLocation, 4, gl.FLOAT, false, 0, 0);
+    
+    gl.uniform1f(rotationLocation, rotation);
+    
+    gl.drawArrays(gl.LINES, 0, object.vertexCount);
+}
+
+// Function to Draw a Hand
+function drawHand(hand, rotation) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, hand.position);
+    gl.enableVertexAttribArray(positionLocation);
+    gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+    
+    gl.bindBuffer(gl.ARRAY_BUFFER, hand.color);
+    gl.enableVertexAttribArray(colorLocation);
+    gl.vertexAttribPointer(colorLocation, 4, gl.FLOAT, false, 0, 0);
+    
+    gl.uniform1f(rotationLocation, rotation);
+    
+    gl.drawArrays(gl.TRIANGLES, 0, hand.vertexCount);
+}
+
+// Function to Draw the Circle
+function drawCircle(circle, rotation = 0) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, circle.position);
+    gl.enableVertexAttribArray(positionLocation);
+    gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+    
+    gl.bindBuffer(gl.ARRAY_BUFFER, circle.color);
+    gl.enableVertexAttribArray(colorLocation);
+    gl.vertexAttribPointer(colorLocation, 4, gl.FLOAT, false, 0, 0);
+    
+    gl.uniform1f(rotationLocation, rotation);
+    
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, circle.vertexCount);
+}
+
+// Variables to Track Pan and Zoom
+let scaleFactor = 1.0;
+let panX = 0.0;
+let panY = 0.0;
+
+// Variables to Handle Dragging
+let isDragging = false;
+let lastX = 0;
+let lastY = 0;
+
+// Event Listeners for Mouse Interactions
+canvas.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    canvas.style.cursor = 'grabbing';
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    if (isDragging) {
+        const deltaX = (e.clientX - lastX) / canvas.width * 2 / scaleFactor;
+        const deltaY = (e.clientY - lastY) / canvas.height * 2 / scaleFactor;
+        panX += deltaX;
+        panY -= deltaY;  // Invert Y axis for natural panning
+        lastX = e.clientX;
+        lastY = e.clientY;
+    }
+});
+
+canvas.addEventListener('mouseup', () => {
+    isDragging = false;
+    canvas.style.cursor = 'grab';
+});
+
+canvas.addEventListener('mouseleave', () => {
+    isDragging = false;
+    canvas.style.cursor = 'grab';
+});
+
+// Event Listener for Mouse Wheel (Zoom)
+canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const zoomIntensity = 0.001;
+    const wheel = e.deltaY;
+    const zoom = Math.exp(wheel * zoomIntensity);
+    scaleFactor *= zoom;
+
+    // Limit zoom levels
+    scaleFactor = Math.min(Math.max(scaleFactor, 0.5), 5.0);
+}, { passive: false });
+
+// Touch Event Handlers for Mobile Devices
+let ongoingTouches = [];
+
+canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    for (let touch of e.changedTouches) {
+        ongoingTouches.push(copyTouch(touch));
+    }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (ongoingTouches.length === 1) {
+        // Single touch: panning
+        const touch = e.changedTouches[0];
+        const lastTouch = ongoingTouches.find(t => t.identifier === touch.identifier);
+        if (lastTouch) {
+            const deltaX = (touch.clientX - lastTouch.clientX) / canvas.width * 2 / scaleFactor;
+            const deltaY = (touch.clientY - lastTouch.clientY) / canvas.height * 2 / scaleFactor;
+            panX += deltaX;
+            panY -= deltaY;
+            // Update the last touch position
+            lastTouch.clientX = touch.clientX;
+            lastTouch.clientY = touch.clientY;
+        }
+    } else if (ongoingTouches.length === 2) {
+        // Two touches: zooming
+        const touch1 = ongoingTouches[0];
+        const touch2 = ongoingTouches[1];
+        const currentTouch1 = Array.from(e.changedTouches).find(t => t.identifier === touch1.identifier);
+        const currentTouch2 = Array.from(e.changedTouches).find(t => t.identifier === touch2.identifier);
+        if (currentTouch1 && currentTouch2) {
+            const prevDist = distance(touch1, touch2);
+            const newDist = distance(currentTouch1, currentTouch2);
+            const zoom = newDist / prevDist;
+            scaleFactor *= zoom;
+
+            // Limit zoom levels
+            scaleFactor = Math.min(Math.max(scaleFactor, 0.5), 5.0);
+
+            // Update the last touch positions
+            touch1.clientX = currentTouch1.clientX;
+            touch1.clientY = currentTouch1.clientY;
+            touch2.clientX = currentTouch2.clientX;
+            touch2.clientY = currentTouch2.clientY;
+        }
+    }
+}, { passive: false });
+
+canvas.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    for (let touch of e.changedTouches) {
+        const idx = ongoingTouches.findIndex(t => t.identifier === touch.identifier);
+        if (idx >= 0) {
+            ongoingTouches.splice(idx, 1);
+        }
+    }
+}, { passive: false });
+
+canvas.addEventListener('touchcancel', (e) => {
+    e.preventDefault();
+    for (let touch of e.changedTouches) {
+        const idx = ongoingTouches.findIndex(t => t.identifier === touch.identifier);
+        if (idx >= 0) {
+            ongoingTouches.splice(idx, 1);
+        }
+    }
+}, { passive: false });
+
+// Helper Functions for Touch Events
+function copyTouch(touch) {
+    return { identifier: touch.identifier, clientX: touch.clientX, clientY: touch.clientY };
+}
+
+function distance(touch1, touch2) {
+    const dx = touch2.clientX - touch1.clientX;
+    const dy = touch2.clientY - touch1.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+// Function to Draw the Scene
+function draw() {
+    const displayWidth = canvas.clientWidth;
+    const displayHeight = canvas.clientHeight;
+    const size = Math.min(displayWidth, displayHeight);
+    
+    if (canvas.width !== size || canvas.height !== size) {
+        canvas.width = size;
+        canvas.height = size;
+    }
+    
+    gl.viewport(0, 0, size, size);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    
+    gl.useProgram(program);
+    
+    // Create the transformation matrix with scaling and panning
+    let matrix = createMatrix();
+    matrix = scale(matrix, scaleFactor, scaleFactor);
+    matrix = translate(matrix, panX, panY);
+    gl.uniformMatrix4fv(matrixLocation, false, matrix);
+    
+    // Draw the white circular watch face first
+    drawCircle(circle, 0);
+    
+    // Draw the static markers
+    drawLines(markers, 0);
+    
+    // Get current time
+    const now = new Date();
+    const hours = now.getHours() % 12;
+    const minutes = now.getMinutes();
+    const seconds = now.getSeconds();
+    
+    // Calculate angles for each hand
+    const hourAngle = (hours + minutes / 60) * (Math.PI / 6);        // 30 degrees per hour
+    const minuteAngle = (minutes + seconds / 60) * (Math.PI / 30);  // 6 degrees per minute
+    const secondAngle = seconds * (Math.PI / 30);                   // 6 degrees per second (no smooth movement)
+    
+    // Draw the hands
+    drawHand(hourHand, hourAngle);
+    drawHand(minuteHand, minuteAngle);
+    drawHand(secondHand, secondAngle);
+}
+
+// WebGL Configuration
+gl.enable(gl.BLEND);
+gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+gl.clearColor(0.0, 0.0, 0.0, 1.0);
+
+// Animation Loop
+function animate() {
+    draw();
+    requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+</body>
+</html>
+
+
+
+
+
+
