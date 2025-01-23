@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Time Crystal Visualization (with Phong Shading)</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: black;
+    }
+    canvas {
+      display: block;
+    }
+
+    /* Top-right slider container, hidden by default, appears on hover */
+    #freqSliderContainer {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 8px;
+      background: rgba(30, 30, 30, 0.7);
+      border-radius: 4px;
+      transition: opacity 0.3s;
+      opacity: 0.1;
+      color: #fff;
+      z-index: 9999;
+    }
+    #freqSliderContainer:hover {
+      opacity: 1;
+    }
+    #freqLabel {
+      display: block;
+      margin-bottom: 6px;
+    }
+    #freqSlider {
+      width: 300px; /* fairly long slider */
+    }
+  </style>
+</head>
+<body>
+<!-- Slider for controlling the 2nd child's frequency -->
+<div id="freqSliderContainer">
+  <label id="freqLabel" for="freqSlider">Inner Ring Frequency (Hz)</label>
+  <input type="range" id="freqSlider" min="10" max="10000" step="10" value="80">
+  <span id="freqValue">10000Hz</span>
+</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.skypack.dev/three@0.132.2/build/three.module.js';
+import { OrbitControls } from 'https://cdn.skypack.dev/three@0.132.2/examples/jsm/controls/OrbitControls.js';
+
+/* -----------------------------------------------------------------
+   1) Cylinder Class
+   ----------------------------------------------------------------- */
+class Cylinder {
+  /**
+   * Creates a spiral cylinder with `numPoints` spheres, plus a white wireframe.
+   * @param {number} numPoints
+   * @param {number} radius
+   * @param {number} height
+   * @param {number} color     - hex color for spheres
+   * @param {number} sphereRad - radius of each sphere
+   */
+  constructor(numPoints, radius, height, color, sphereRad) {
+    this.numPoints = numPoints;
+    this.radius    = radius;
+    this.height    = height;
+
+    this.group     = new THREE.Group();
+    this.positions = []; // local positions: {x,y,z}
+    this.spheres   = []; // array of Meshes
+
+    // --- PHONG SHADING MATERIAL ---
+    // We use MeshPhongMaterial so spheres respond to lights & show highlights.
+    const sphereGeom = new THREE.SphereGeometry(sphereRad, 16, 16); 
+    // (16,16) for a bit smoother sphere
+    const sphereMat  = new THREE.MeshPhongMaterial({
+      color: color,
+      shininess: 60 // you can adjust shininess to taste
+    });
+
+    // Wireframe line geometry for the spiral path
+    const linePositions = new Float32Array((numPoints - 1) * 6);
+
+    for (let i=0; i<numPoints; i++) {
+      const fraction = i / (numPoints-1);
+      const angle    = 8 * Math.PI * fraction;
+      const x = this.radius * Math.cos(angle);
+      const y = this.height * (fraction - 0.5);
+      const z = this.radius * Math.sin(angle);
+
+      this.positions.push({ x, y, z });
+
+      // Create a small sphere
+      const sphere = new THREE.Mesh(sphereGeom, sphereMat);
+      sphere.position.set(x, y, z);
+      this.group.add(sphere);
+      this.spheres.push(sphere);
+
+      // Connect consecutive points with lines
+      if (i < numPoints-1) {
+        const nextFrac  = (i+1)/(numPoints-1);
+        const nextAngle = 8*Math.PI*nextFrac;
+        const x2 = this.radius * Math.cos(nextAngle);
+        const y2 = this.height * (nextFrac - 0.5);
+        const z2 = this.radius * Math.sin(nextAngle);
+
+        const idx = i*6;
+        linePositions[idx+0]= x;  linePositions[idx+1]= y;  linePositions[idx+2]= z;
+        linePositions[idx+3]= x2; linePositions[idx+4]= y2; linePositions[idx+5]= z2;
+      }
+    }
+
+    const wireGeom = new THREE.BufferGeometry();
+    wireGeom.setAttribute(
+      'position',
+      new THREE.BufferAttribute(linePositions, 3)
+    );
+    const wireMat = new THREE.LineBasicMaterial({ color: 0xffffff });
+    const wireSegs = new THREE.LineSegments(wireGeom, wireMat);
+    this.group.add(wireSegs);
+  }
+
+  getObject3D()  { return this.group; }
+  getPositions() { return this.positions; }
+  getSpheres()   { return this.spheres; }
+}
+
+/* -----------------------------------------------------------------
+   2) ConnectionManager
+   ----------------------------------------------------------------- 
+   We will "chunk" the child array in groups of 10, connecting each
+   chunk to exactly one parent sphere by index. For example:
+     - child spheres indices 0..9 => parent sphere 0
+     - child spheres indices 10..19 => parent sphere 1
+     - ...
+   This ensures each child sphere has exactly 1 upward connection,
+   and each parent sphere has exactly 10 downward connections,
+   with no skipping or leftover.
+*/
+class ConnectionManager {
+  constructor() {
+    this.linePositions = null;
+    this.lineGeom = null;
+    this.lineSegments = null;
+
+    // We store all line pairs as { childSphere, parentSphere }
+    this.lines = [];
+  }
+
+  /**
+   * Connect child array of size childCount to parent array of size parentCount
+   * by chunking in groups of 10 (child). This means:
+   *   - child spheres [0..9] => parentSphere index=0
+   *   - child spheres [10..19] => parentSphere index=1
+   *   etc.
+   *
+   * The total childCount must be exactly parentCount*10
+   */
+  chunkConnections(childCyl, parentCyl, chunkSize=10) {
+    const childSpheres  = childCyl.getSpheres();
+    const parentSpheres = parentCyl.getSpheres();
+
+    const childCount  = childSpheres.length;
+    const parentCount = parentSpheres.length;
+    const needed = parentCount * chunkSize; // e.g. 100*10=1000 or 1000*10=10000
+
+    if (childCount !== needed) {
+      console.error(`Mismatch in chunking: childCount=${childCount} but parentCount*chunkSize=${needed}`);
+      return;
+    }
+
+    // For each parentIndex = 0..(parentCount-1), we take childIndices
+    // from (parentIndex*chunkSize) .. (parentIndex*chunkSize + 9).
+    // This ensures each parent gets exactly 10 child spheres, in order,
+    // and each child sphere gets exactly 1 upward connection.
+    for (let p=0; p<parentCount; p++) {
+      const startChildIndex = p*chunkSize;
+      const endChildIndex   = (p+1)*chunkSize - 1; // inclusive
+
+      for (let c=startChildIndex; c<=endChildIndex; c++) {
+        this.lines.push({
+          childSphere : childSpheres[c],
+          parentSphere: parentSpheres[p]
+        });
+      }
+    }
+  }
+
+  finalize(scene) {
+    const N = this.lines.length; 
+    // each line => 2 endpoints => 6 floats
+    this.linePositions = new Float32Array(N*6);
+
+    this.lineGeom = new THREE.BufferGeometry();
+    this.lineGeom.setAttribute(
+      'position',
+      new THREE.BufferAttribute(this.linePositions, 3)
+    );
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x888888 });
+    this.lineSegments = new THREE.LineSegments(this.lineGeom, lineMat);
+    scene.add(this.lineSegments);
+  }
+
+  updateLinePositions() {
+    if(!this.linePositions) return;
+    const tmp = new THREE.Vector3();
+    let idx = 0;
+
+    for (let i=0; i<this.lines.length; i++) {
+      const { childSphere, parentSphere } = this.lines[i];
+
+      // child's position
+      childSphere.getWorldPosition(tmp);
+      this.linePositions[idx+0] = tmp.x;
+      this.linePositions[idx+1] = tmp.y;
+      this.linePositions[idx+2] = tmp.z;
+
+      // parent's position
+      parentSphere.getWorldPosition(tmp);
+      this.linePositions[idx+3] = tmp.x;
+      this.linePositions[idx+4] = tmp.y;
+      this.linePositions[idx+5] = tmp.z;
+
+      idx+=6;
+    }
+
+    this.lineGeom.attributes.position.needsUpdate=true;
+  }
+}
+
+/* -----------------------------------------------------------------
+   3) Main Scene
+   ----------------------------------------------------------------- */
+let scene, camera, renderer, controls;
+
+// The three cylinders
+let parentCyl, child1Cyl, child2Cyl;
+
+// The two managers for connections: (child2->child1) and (child1->parent)
+let child2toChild1Manager, child1toParentManager;
+
+// Child2 frequency from the slider
+let child2FrequencyHz=80;  /* initial speed is slow */
+
+function init() {
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x000000);
+
+  // Add lights for Phong shading
+  // A little ambient + a directional light from above
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+  scene.add(ambientLight);
+
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  dirLight.position.set(5, 10, 5);
+  scene.add(dirLight);
+
+  camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 3000);
+  camera.position.set(0,0,24);
+
+  renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping=true;
+  controls.dampingFactor=0.05;
+  controls.enablePan=true;
+  controls.enableZoom=true;
+
+  window.addEventListener('resize', onWindowResize);
+
+  // 1) Parent cylinder: 100 spheres (red)
+  parentCyl = new Cylinder(
+    100,
+    2.0,    // radius
+    4.0,    // height
+    0xff0000, // red
+    0.1      // sphere radius
+  );
+  scene.add(parentCyl.getObject3D());
+
+  // 2) 1st child cylinder: 1000 spheres (blue)
+  child1Cyl = new Cylinder(
+    1000,
+    1.7,
+    4.0,
+    0x0000ff,  // blue
+    0.015
+  );
+  scene.add(child1Cyl.getObject3D());
+
+  // 3) 2nd child cylinder: 10000 spheres (orange)
+  child2Cyl = new Cylinder(
+    10000,
+    1.445,
+    4.0,
+    0xffa500,  // orange
+    0.001
+  );
+  scene.add(child2Cyl.getObject3D());
+
+  // Now connect Child2->Child1 in array chunks of 10
+  // child2 array size=10000 => child1 array size=1000 => chunk=10
+  child2toChild1Manager = new ConnectionManager();
+  child2toChild1Manager.chunkConnections(child2Cyl, child1Cyl, 10);
+  child2toChild1Manager.finalize(scene);
+
+  // Then connect Child1->Parent in array chunks of 10
+  // child1 array size=1000 => parent array size=100 => chunk=10
+  child1toParentManager = new ConnectionManager();
+  child1toParentManager.chunkConnections(child1Cyl, parentCyl, 10);
+  child1toParentManager.finalize(scene);
+
+  // Hook up the slider for child2 frequency
+  const freqSlider = document.getElementById('freqSlider');
+  const freqValue  = document.getElementById('freqValue');
+  freqSlider.addEventListener('input', ()=>{
+    child2FrequencyHz = parseFloat(freqSlider.value);
+    freqValue.textContent = child2FrequencyHz.toFixed(0)+"Hz";
+  });
+}
+
+function onWindowResize() {
+  camera.aspect=window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+/* -----------------------------------------------------------------
+   4) Animation Loop
+   ----------------------------------------------------------------- 
+   - child2 freq=child2FrequencyHz, amplitude ~0.000157
+   - child1 freq=child2freq/10 => amplitude= ~0.00157
+   - parent freq=child1freq/10 => amplitude= ~0.0157
+*/
+function animate(timeMs) {
+  const timeSeconds = timeMs * 0.001;
+
+  // 2nd child cylinder (orange)
+  const amp2  = 0.000157;
+  const angle2= amp2 * Math.sin(2*Math.PI*child2FrequencyHz*timeSeconds);
+  child2Cyl.getObject3D().rotation.y = angle2;
+
+  // 1st child cylinder (blue)
+  const freq1 = child2FrequencyHz/10;
+  const amp1  = amp2*10; // => 0.00157
+  const angle1= amp1 * Math.sin(2*Math.PI*freq1*timeSeconds);
+  child1Cyl.getObject3D().rotation.y = angle1;
+
+  // parent cylinder (red)
+  const freqP = freq1/10;  // => child2FrequencyHz/100
+  const ampP  = amp1*10;   // => 0.0157
+  const angleP= ampP * Math.sin(2*Math.PI*freqP*timeSeconds);
+  parentCyl.getObject3D().rotation.y = angleP;
+
+  // Update line positions so they track the real-time sphere locations
+  child2toChild1Manager.updateLinePositions();
+  child1toParentManager.updateLinePositions();
+
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+
+window.onload=function(){
+  init();
+  animate();
+};
+</script>
+</body>
+</html>
