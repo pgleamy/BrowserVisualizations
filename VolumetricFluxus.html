@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dynamic Particle Flow with Multiple Equations</title>
+    <style>
+        body { 
+            margin: 0; 
+            background: #000; 
+            overflow: hidden; 
+            font-family: Arial, sans-serif;
+        }
+        canvas { 
+            width: 100vw; 
+            height: 100vh; 
+            display: block; 
+        }
+        #instructions {
+            position: fixed;
+            bottom: 8px;
+            left: 8px;
+            color: white;
+            font-size: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 3px 5px;
+            border-radius: 3px;
+            pointer-events: none;
+        }
+        #controls {
+            position: fixed;
+            top: 8px;
+            right: 8px;
+            width: 220px; /* Increased width to accommodate additional sliders */
+            background: rgba(20, 20, 25, 0.9);
+            padding: 10px;
+            border-radius: 4px;
+            color: #fff;
+            z-index: 1000;
+            box-shadow: 0 0 6px rgba(0,0,0,0.5);
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        .control-group {
+            margin-bottom: 12px;
+        }
+        .control-group h3 {
+            margin: 0 0 5px 0;
+            font-size: 12px;
+            color: #4a9eff;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #555;
+            padding-bottom: 3px;
+        }
+        .control-item {
+            margin-bottom: 8px;
+        }
+        .control-item label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #aaa;
+            font-size: 10px;
+            margin-bottom: 2px;
+        }
+        input[type="range"] {
+            width: 100%;
+            background: #2a2a30;
+            height: 4px;
+            border-radius: 2px;
+            -webkit-appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            background: #4a9eff;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            background: #6ab0ff;
+        }
+        /* Tooltip styling */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 140px;
+            background-color: rgba(0,0,0,0.8);
+            color: #fff;
+            text-align: center;
+            border-radius: 3px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%; /* Position above the slider */
+            left: 50%;
+            margin-left: -70px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 8px;
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="glCanvas"></canvas>
+    <div id="controls">
+        <!-- Lissajous Curves Controls -->
+        <div class="control-group">
+            <h3>Lissajous</h3>
+            <div class="control-item">
+                <label>A<span id="lissajousA-value">20.0</span></label>
+                <div class="tooltip">
+                    <input type="range" id="lissajousA" min="0.1" max="100.0" step="0.01" value="20.0">
+                    <span class="tooltiptext">Amplitude X</span>
+                </div>
+            </div>
+            <div class="control-item">
+                <label>a<span id="lissajousA_freq-value">3.0</span></label>
+                <div class="tooltip">
+                    <input type="range" id="lissajousA_freq" min="0.1" max="25.0" step="0.01" value="3.0">
+                    <span class="tooltiptext">Frequency X</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Rose Curves Controls -->
+        <div class="control-group">
+            <h3>Rose</h3>
+            <div class="control-item">
+                <label>a<span id="roseA-value">10.0</span></label>
+                <div class="tooltip">
+                    <input type="range" id="roseA" min="0.1" max="300.0" step="0.01" value="10.0">
+                    <span class="tooltiptext">Amplitude</span>
+                </div>
+            </div>
+            <div class="control-item">
+                <label>k<span id="roseK-value">20.0</span></label>
+                <div class="tooltip">
+                    <input type="range" id="roseK" min="-100" max="100.0" step="0.01" value="20.0">
+                    <span class="tooltiptext">Petal Count</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Harmonic Oscillator Controls -->
+        <div class="control-group">
+            <h3>Oscillator</h3>
+            <div class="control-item">
+                <label>A<span id="oscillatorA-value">10.0</span></label>
+                <div class="tooltip">
+                    <input type="range" id="oscillatorA" min="0.5" max="100.0" step="0.01" value="10.0">
+                    <span class="tooltiptext">Amplitude</span>
+                </div>
+            </div>
+            <div class="control-item">
+                <label>ω<span id="oscillatorW-value">3.0</span></label>
+                <div class="tooltip">
+                    <input type="range" id="oscillatorW" min="0.1" max="30.0" step="0.01" value="3.0">
+                    <span class="tooltiptext">Frequency</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Fourier Series Controls -->
+        <div class="control-group">
+            <h3>Fourier</h3>
+            <div class="control-item">
+                <label>n<span id="fourierN-value">80</span></label>
+                <div class="tooltip">
+                    <input type="range" id="fourierN" min="1" max="200" step="1" value="80">
+                    <span class="tooltiptext">Number of Terms</span>
+                </div>
+            </div>
+            <div class="control-item">
+                <label>A<span id="fourierA-value">20.0</span></label>
+                <div class="tooltip">
+                    <input type="range" id="fourierA" min="0.5" max="100.0" step="0.01" value="20.0">
+                    <span class="tooltiptext">Amplitude</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Particle Count Control -->
+        <div class="control-group">
+            <h3>Particles</h3>
+            <div class="control-item">
+                <label>numPoints<span id="numPoints-value">15000</span></label>
+                <div class="tooltip">
+                    <input type="range" id="numPoints" min="10000" max="1000000" step="1000" value="150000">
+                    <span class="tooltiptext">Number of Particles</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Point Size Control -->
+        <div class="control-group">
+            <h3>Point Size</h3>
+            <div class="control-item">
+                <label>Size<span id="pointSize-value">2</span></label>
+                <div class="tooltip">
+                    <input type="range" id="pointSize" min="0.01" max="3" step="0.01" value="1.3">
+                    <span class="tooltiptext">Size of Each Particle</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Animation Speed Control -->
+        <div class="control-group">
+            <h3>Animation</h3>
+            <div class="control-item">
+                <label>Speed<span id="animationSpeed-value">1.0</span></label>
+                <div class="tooltip">
+                    <input type="range" id="animationSpeed" min="0" max="6" step="0.001" value="1">
+                    <span class="tooltiptext">Animation Speed</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vertex Shader -->
+    <script id="vertexShader" type="x-shader/x-vertex">
+        precision mediump float;
+        
+        attribute vec3 position;
+        attribute float type; // 0.0 for Red, 1.0 for White
+        attribute float zone; // 0.0 to 9.0 for zones 0-9
+        uniform mat4 projectionMatrix;
+        uniform mat4 modelViewMatrix;
+        uniform float time;
+        uniform float pointSize;
+        
+        // Lissajous parameters
+        uniform float lissajousA;
+        uniform float lissajousA_freq;
+        
+        // Rose parameters
+        uniform float roseA;
+        uniform float roseK;
+        
+        // Harmonic Oscillator parameters
+        uniform float oscillatorA;
+        uniform float oscillatorW;
+        
+        // Fourier parameters
+        uniform int fourierN;
+        uniform float fourierA;
+        
+        uniform float interParticleForce; // Existing parameter
+        
+        varying float vType; // Pass type to fragment shader
+        varying float vDistortion;
+        
+        void main() {
+            vec3 pos = position;
+            
+            // Calculate perturbation based on zone
+            float perturb = sin(zone * 0.314 + time * 0.1); // 0.314 ~ pi/10
+            
+            // Lissajous Flow
+            float lx = lissajousA * sin(lissajousA_freq * time + perturb);
+            float ly = lissajousA * sin(lissajousA_freq * time + 3.1415 / 2.0 + perturb);
+            vec3 flowLissajous = vec3(lx, ly, 0.0);
+            
+            // Rose Curve Flow
+            float theta = atan(pos.y, pos.x);
+            float r = length(pos.xy);
+            float rRose = roseA * cos(roseK * theta + perturb);
+            vec3 flowRose = vec3(rRose * cos(theta), rRose * sin(theta), 0.0);
+            
+            // Harmonic Oscillator Flow
+            float ox = oscillatorA * cos(oscillatorW * time + perturb);
+            float oy = oscillatorA * sin(oscillatorW * time + perturb);
+            vec3 flowOscillator = vec3(ox, oy, 0.0);
+            
+            // Fourier Series Flow
+            vec3 flowFourier = vec3(0.0);
+            for(int i = 1; i <= 200; i++) { // Adjusted max to match fourierN=200
+                if(i > fourierN) break;
+                float freq = float(i);
+                flowFourier += (1.0 / float(i)) * sin(freq * oscillatorW * time + perturb) * vec3(cos(freq * theta + perturb), sin(freq * theta + perturb), 0.0);
+            }
+            flowFourier *= fourierA;
+            
+            // Combined Flow
+            vec3 combinedFlow = flowLissajous + flowRose + flowOscillator + flowFourier;
+            
+            // Apply combined flow to position with inter-particle force
+            pos += combinedFlow * 0.05; // Adjust scaling factor as needed
+            pos += combinedFlow * interParticleForce;
+            
+            vType = type;
+            vDistortion = length(combinedFlow);
+            
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+            gl_PointSize = pointSize; // Dynamic point size
+        }
+    </script>
+
+    <!-- Fragment Shader -->
+    <script id="fragmentShader" type="x-shader/x-fragment">
+        precision mediump float;
+        
+        varying float vType; // Received from vertex shader
+        varying float vDistortion;
+        uniform float time;
+        uniform float particleBrightness;
+        uniform float colorIntensity;
+        uniform float colorSpeed;
+        uniform float colorVariation;
+        
+        void main() {
+            vec2 coord = gl_PointCoord * 2.0 - 1.0;
+            float r = length(coord);
+            if(r > 1.0) discard;
+            
+            // **Set color based on type**
+            vec3 baseColor = mix(vec3(0.2), vec3(0.2, 0.0, 0.0), step(0.1, vType)); // White or Red
+            
+            // Dynamic color variation using time
+            vec3 dynamicColor = baseColor * (1.0 + sin(time * colorSpeed + vType * colorVariation)) * colorIntensity;
+            
+            // Combine with distortion effects
+            vec3 color = dynamicColor + vec3(1.0, 0.5, 0.5) * exp(-r * 5.0) * vDistortion;
+            
+            float alpha = (1.0 - r) * (1.0 + vDistortion * 0.5) + particleBrightness;
+            gl_FragColor = vec4(color-.99, alpha-.99);
+
+        }
+    </script>
+
+    <!-- Main JavaScript -->
+    <script>
+        const main = () => {
+            const canvas = document.getElementById('glCanvas');
+            const gl = canvas.getContext('webgl', { alpha: false });
+            if (!gl) {
+                alert('WebGL not supported');
+                return;
+            }
+
+            let time = 0;
+            let animationSpeed = 1.0; // Default animation speed multiplier
+            let cameraRotation = { x: 0, y: 0 };
+            let cameraDistance = 10; // Increased default for better view
+            let isDragging = false;
+            let isPanning = false;
+            let previousMousePosition = { x: 0, y: 0 };
+            let panOffset = { x: 0, y: 0 }; // New variables for panning
+            let numParticles = 15000; // Initial number of particles (as per user modification)
+
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+
+            // Shader compilation utility
+            function createShader(type, source) {
+                const shader = gl.createShader(type);
+                gl.shaderSource(shader, source);
+                gl.compileShader(shader);
+                
+                if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                    console.error('Shader error:', gl.getShaderInfoLog(shader));
+                    gl.deleteShader(shader);
+                    return null;
+                }
+                return shader;
+            }
+
+            // Create and compile shaders
+            const vertexShader = createShader(gl.VERTEX_SHADER, document.getElementById('vertexShader').text);
+            const fragmentShader = createShader(gl.FRAGMENT_SHADER, document.getElementById('fragmentShader').text);
+            const program = gl.createProgram();
+            
+            gl.attachShader(program, vertexShader);
+            gl.attachShader(program, fragmentShader);
+            gl.linkProgram(program);
+
+            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                console.error('Program error:', gl.getProgramInfoLog(program));
+                return;
+            }
+
+            gl.useProgram(program);
+
+            // Create buffers
+            const positionBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+
+            const typeBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, typeBuffer);
+
+            const zoneBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, zoneBuffer);
+
+            // Initialize particles
+            let positions = new Float32Array(numParticles * 3);
+            let types = new Float32Array(numParticles); // 0.0 for Red, 1.0 for White
+            let zones = new Float32Array(numParticles); // 0.0 to 9.0 for zones 0-9
+
+            function initParticles(newCount) {
+                numParticles = newCount;
+                positions = new Float32Array(numParticles * 3);
+                types = new Float32Array(numParticles);
+                zones = new Float32Array(numParticles);
+
+                for (let i = 0; i < numParticles; i++) {
+                    const idx = i * 3;
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    const r = Math.pow(Math.random(), 1/3) * 4; // Increased range for better dispersion
+                    
+                    positions[idx] = r * Math.sin(phi) * Math.cos(theta);
+                    positions[idx + 1] = r * Math.sin(phi) * Math.sin(theta);
+                    positions[idx + 2] = r * Math.cos(phi);
+                    
+                    // Assign type: 0.0 (Red) or 1.0 (White)
+                    types[i] = Math.random() < 0.5 ? 0.0 : 1.0;
+                    
+                    // Assign zone: 0.0 to 9.0
+                    zones[i] = Math.floor(Math.random() * 10); // Zones 0-9
+                }
+                
+                // Update position buffer
+                gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, positions, gl.DYNAMIC_DRAW);
+                
+                // Update type buffer
+                gl.bindBuffer(gl.ARRAY_BUFFER, typeBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, types, gl.STATIC_DRAW);
+                
+                // Update zone buffer
+                gl.bindBuffer(gl.ARRAY_BUFFER, zoneBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, zones, gl.STATIC_DRAW);
+            }
+
+            // Initialize with default particle count
+            initParticles(numParticles);
+
+            // Set up position attribute
+            const positionLocation = gl.getAttribLocation(program, 'position');
+            gl.enableVertexAttribArray(positionLocation);
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+            gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0);
+
+            // Set up type attribute
+            const typeLocation = gl.getAttribLocation(program, 'type');
+            gl.enableVertexAttribArray(typeLocation);
+            gl.bindBuffer(gl.ARRAY_BUFFER, typeBuffer);
+            gl.vertexAttribPointer(typeLocation, 1, gl.FLOAT, false, 0, 0);
+
+            // Set up zone attribute
+            const zoneLocation = gl.getAttribLocation(program, 'zone');
+            gl.enableVertexAttribArray(zoneLocation);
+            gl.bindBuffer(gl.ARRAY_BUFFER, zoneBuffer);
+            gl.vertexAttribPointer(zoneLocation, 1, gl.FLOAT, false, 0, 0);
+
+            // Get uniform locations
+            const uniforms = {
+                time: gl.getUniformLocation(program, 'time'),
+                projectionMatrix: gl.getUniformLocation(program, 'projectionMatrix'),
+                modelViewMatrix: gl.getUniformLocation(program, 'modelViewMatrix'),
+                lissajousA: gl.getUniformLocation(program, 'lissajousA'),
+                lissajousA_freq: gl.getUniformLocation(program, 'lissajousA_freq'),
+                roseA: gl.getUniformLocation(program, 'roseA'),
+                roseK: gl.getUniformLocation(program, 'roseK'),
+                oscillatorA: gl.getUniformLocation(program, 'oscillatorA'),
+                oscillatorW: gl.getUniformLocation(program, 'oscillatorW'),
+                fourierN: gl.getUniformLocation(program, 'fourierN'),
+                fourierA: gl.getUniformLocation(program, 'fourierA'),
+                interParticleForce: gl.getUniformLocation(program, 'interParticleForce'), // Existing parameter
+                pointSize: gl.getUniformLocation(program, 'pointSize') // New uniform for point size
+            };
+
+            // Get fragment shader uniform locations
+            const fragUniforms = {
+                particleBrightness: gl.getUniformLocation(program, 'particleBrightness'),
+                colorIntensity: gl.getUniformLocation(program, 'colorIntensity'),
+                colorSpeed: gl.getUniformLocation(program, 'colorSpeed'),
+                colorVariation: gl.getUniformLocation(program, 'colorVariation')
+            };
+
+            // Define projection and model-view matrices
+            const projectionMatrix = new Float32Array(16);
+            const modelViewMatrix = new Float32Array(16);
+
+            function resize() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                gl.viewport(0, 0, canvas.width, canvas.height);
+            }
+
+            window.addEventListener('resize', resize);
+            resize();
+
+            // Mouse interaction handlers (camera rotation and panning)
+            canvas.addEventListener('mousedown', (e) => {
+                if (e.shiftKey) {
+                    isPanning = true;
+                } else {
+                    isDragging = true;
+                }
+                previousMousePosition = {
+                    x: e.clientX,
+                    y: e.clientY
+                };
+            });
+
+            canvas.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const deltaX = e.clientX - previousMousePosition.x;
+                    const deltaY = e.clientY - previousMousePosition.y;
+                    
+                    cameraRotation.y += deltaX * 0.005;
+                    cameraRotation.x += deltaY * 0.005;
+                    cameraRotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, cameraRotation.x));
+                    
+                    previousMousePosition = {
+                        x: e.clientX,
+                        y: e.clientY
+                    };
+                }
+                if (isPanning) {
+                    const deltaX = e.clientX - previousMousePosition.x;
+                    const deltaY = e.clientY - previousMousePosition.y;
+                    
+                    // Adjust panOffset based on mouse movement and camera distance
+                    panOffset.x += deltaX * 0.01 * (cameraDistance / 10);
+                    panOffset.y -= deltaY * 0.01 * (cameraDistance / 10);
+                    
+                    previousMousePosition = {
+                        x: e.clientX,
+                        y: e.clientY
+                    };
+                }
+            });
+
+            canvas.addEventListener('mouseout', () => {
+                isDragging = false;
+                isPanning = false;
+            });
+
+            canvas.addEventListener('mouseup', () => {
+                isDragging = false;
+                isPanning = false;
+            });
+
+            canvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                // Implement infinite zoom by allowing cameraDistance to grow/shrink without strict limits
+                cameraDistance += e.deltaY * 0.05;
+                cameraDistance = Math.max(0.1, cameraDistance); // Prevent negative or zero distance
+            });
+
+            // Compute Model-View Matrix
+            function computeModelViewMatrix() {
+                // Reset the matrix
+                for(let i=0;i<16;i++) modelViewMatrix[i] = 0;
+                modelViewMatrix[15] = 1;
+
+                // Apply panning
+                modelViewMatrix[12] = panOffset.x;
+                modelViewMatrix[13] = panOffset.y;
+
+                // Apply rotation
+                const cx = Math.cos(cameraRotation.x);
+                const sx = Math.sin(cameraRotation.x);
+                const cy = Math.cos(cameraRotation.y);
+                const sy = Math.sin(cameraRotation.y);
+                
+                modelViewMatrix[0] = cy;
+                modelViewMatrix[1] = 0;
+                modelViewMatrix[2] = sy;
+                modelViewMatrix[3] = 0;
+
+                modelViewMatrix[4] = sx * sy;
+                modelViewMatrix[5] = cx;
+                modelViewMatrix[6] = -sx * cy;
+                modelViewMatrix[7] = 0;
+
+                modelViewMatrix[8] = -cx * sy;
+                modelViewMatrix[9] = sx;
+                modelViewMatrix[10] = cx * cy;
+                modelViewMatrix[11] = 0;
+
+                modelViewMatrix[12] += 0.0; // Already set panning
+                modelViewMatrix[13] += 0.0;
+                modelViewMatrix[14] = -cameraDistance;
+                modelViewMatrix[15] = 1.0;
+            }
+
+            // Compute Perspective Matrix with dynamic near and far planes
+            function computePerspectiveMatrix() {
+                const fov = Math.PI / 4; // 45 degrees
+                const aspect = canvas.width / canvas.height;
+                const near = 0.1;
+                const far = 100000.0; // Very large far plane to prevent clipping
+                const f = 1.0 / Math.tan(fov / 2);
+                projectionMatrix[0] = f / aspect;
+                projectionMatrix[1] = 0;
+                projectionMatrix[2] = 0;
+                projectionMatrix[3] = 0;
+
+                projectionMatrix[4] = 0;
+                projectionMatrix[5] = f;
+                projectionMatrix[6] = 0;
+                projectionMatrix[7] = 0;
+
+                projectionMatrix[8] = 0;
+                projectionMatrix[9] = 0;
+                projectionMatrix[10] = (far + near) / (near - far);
+                projectionMatrix[11] = -1;
+
+                projectionMatrix[12] = 0;
+                projectionMatrix[13] = 0;
+                projectionMatrix[14] = (2 * far * near) / (near - far);
+                projectionMatrix[15] = 0;
+            }
+
+            // Initialize parameters
+            const params = {
+                lissajousA: 20.0,
+                lissajousA_freq: 3.0,
+                roseA: 10.0,
+                roseK: 20.0,
+                oscillatorA: 10.0,
+                oscillatorW: 3.0,
+                fourierN: 80,
+                fourierA: 20.0,
+                interParticleForce: 0.010, // Existing parameter
+                animationSpeed: 1.0, // New parameter
+                pointSize: 2.0 // New parameter for point size
+            };
+
+            // Update display values
+            function updateDisplayValues() {
+                document.getElementById('lissajousA-value').textContent = params.lissajousA.toFixed(2);
+                document.getElementById('lissajousA_freq-value').textContent = params.lissajousA_freq.toFixed(2);
+                document.getElementById('roseA-value').textContent = params.roseA.toFixed(2);
+                document.getElementById('roseK-value').textContent = params.roseK.toFixed(2);
+                document.getElementById('oscillatorA-value').textContent = params.oscillatorA.toFixed(2);
+                document.getElementById('oscillatorW-value').textContent = params.oscillatorW.toFixed(2);
+                document.getElementById('fourierN-value').textContent = params.fourierN;
+                document.getElementById('fourierA-value').textContent = params.fourierA.toFixed(2);
+                document.getElementById('numPoints-value').textContent = numParticles;
+                document.getElementById('animationSpeed-value').textContent = params.animationSpeed.toFixed(3);
+                document.getElementById('pointSize-value').textContent = params.pointSize.toFixed(1);
+            }
+
+            // Set up control listeners
+            function setupControls() {
+                const controls = [
+                    'lissajousA', 'lissajousA_freq',
+                    'roseA', 'roseK',
+                    'oscillatorA', 'oscillatorW',
+                    'fourierN', 'fourierA',
+                    'numPoints',
+                    'animationSpeed',
+                    'pointSize' // Added 'pointSize'
+                ];
+
+                controls.forEach(controlId => {
+                    const control = document.getElementById(controlId);
+                    const valueDisplay = document.getElementById(`${controlId}-value`);
+                    
+                    if (!control) {
+                        console.warn(`Control with ID "${controlId}" not found.`);
+                        return; // Skip if the control doesn't exist
+                    }
+                    
+                    control.addEventListener('input', (e) => {
+                        let value;
+                        if(controlId === 'fourierN') {
+                            value = parseInt(e.target.value);
+                            params[controlId] = value;
+                            valueDisplay.textContent = value;
+                        } else if(controlId === 'numPoints') {
+                            value = parseInt(e.target.value);
+                            initParticles(value);
+                            params.numPoints = value;
+                            valueDisplay.textContent = value;
+                        } else if(controlId === 'animationSpeed') {
+                            value = parseFloat(e.target.value);
+                            params[controlId] = value;
+                            valueDisplay.textContent = value.toFixed(3);
+                        } else if(controlId === 'pointSize') {
+                            value = parseFloat(e.target.value);
+                            params[controlId] = value;
+                            valueDisplay.textContent = value.toFixed(1);
+                            gl.uniform1f(uniforms.pointSize, params.pointSize); // Update point size uniform
+                        } else {
+                            value = parseFloat(e.target.value);
+                            params[controlId] = value;
+                            valueDisplay.textContent = (controlId.includes('freq') || controlId.includes('W') || controlId === 'roseK') ? value.toFixed(2) : value.toFixed(2);
+                        }
+
+                        // Update uniform immediately
+                        if(controlId === 'fourierN') {
+                            gl.uniform1i(uniforms.fourierN, params.fourierN);
+                        } else if(controlId === 'animationSpeed') {
+                            // Handled separately in the animation loop
+                        } else if(controlId === 'numPoints') {
+                            // Handled by re-initializing particles
+                        } else if(controlId === 'pointSize') {
+                            // Already handled above
+                        } else {
+                            gl.uniform1f(uniforms[controlId], params[controlId]);
+                        }
+                    });
+                });
+            }
+
+            setupControls();
+            updateDisplayValues();
+
+            // Initialize fragment shader uniforms with default values
+            gl.uniform1f(fragUniforms.particleBrightness, 1.0);
+            gl.uniform1f(fragUniforms.colorIntensity, 1.0);
+            gl.uniform1f(fragUniforms.colorSpeed, 1.0);
+            gl.uniform1f(fragUniforms.colorVariation, 1.0);
+
+            // Main render loop
+            function render() {
+                time += 0.01 * params.animationSpeed;
+
+                // Update position buffer
+                gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+                gl.bufferSubData(gl.ARRAY_BUFFER, 0, positions);
+
+                // Update zone buffer if dynamic behavior is desired
+                // Currently, zones are static. To make them dynamic, modify zones array here and update buffer
+                // Example: zones[i] += 0.01 * animationSpeed;
+                // Not implemented here to maintain distinct zones
+
+                gl.viewport(0, 0, canvas.width, canvas.height);
+                gl.clearColor(0.0, 0.0, 0.0, 1.0);
+                gl.clear(gl.COLOR_BUFFER_BIT);
+                
+                computePerspectiveMatrix();
+                computeModelViewMatrix();
+                
+                gl.uniformMatrix4fv(uniforms.projectionMatrix, false, projectionMatrix);
+                gl.uniformMatrix4fv(uniforms.modelViewMatrix, false, modelViewMatrix);
+                gl.uniform1f(uniforms.time, time);
+                gl.uniform1f(uniforms.interParticleForce, params.interParticleForce);
+
+                // Set other vertex shader uniforms
+                gl.uniform1f(uniforms.lissajousA, params.lissajousA);
+                gl.uniform1f(uniforms.lissajousA_freq, params.lissajousA_freq);
+                gl.uniform1f(uniforms.roseA, params.roseA);
+                gl.uniform1f(uniforms.roseK, params.roseK);
+                gl.uniform1f(uniforms.oscillatorA, params.oscillatorA);
+                gl.uniform1f(uniforms.oscillatorW, params.oscillatorW);
+                gl.uniform1i(uniforms.fourierN, params.fourierN);
+                gl.uniform1f(uniforms.fourierA, params.fourierA);
+                gl.uniform1f(uniforms.pointSize, params.pointSize); // Update point size uniform
+
+                // Set fragment shader uniforms (only need to set once unless they change)
+                gl.uniform1f(fragUniforms.particleBrightness, 1.0);
+                gl.uniform1f(fragUniforms.colorIntensity, 1.0);
+                gl.uniform1f(fragUniforms.colorSpeed, 1.0);
+                gl.uniform1f(fragUniforms.colorVariation, 1.0);
+
+                gl.drawArrays(gl.POINTS, 0, numParticles);
+                requestAnimationFrame(render);
+            }
+
+            render();
+        };
+
+        window.onload = main;
+    </script>
+</body>
+</html>
