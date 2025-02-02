@@ -5,8 +5,16 @@
   <title>Balls Rolling/Bouncing Inside Rotating Sphere with Shadows</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js"></script>
   <style>
-    body { margin: 0; overflow: hidden; background: #222; }
-    #glCanvas { width: 100vw; height: 100vh; display: block; }
+    body { 
+      margin: 0; 
+      overflow: hidden; 
+      background: #222; 
+    }
+    #glCanvas { 
+      width: 100vw; 
+      height: 100vh; 
+      display: block; 
+    }
     #controls {
       position: absolute; 
       top: 10px; 
@@ -17,8 +25,17 @@
       max-width: 320px; 
       font-family: Arial, sans-serif;
       font-size: 14px;
+      opacity: 0;                /* start invisible */
+      transition: opacity 0.3s ease; /* smooth fade */
     }
-    #controls label { display: block; margin-top: 10px; }
+    /* Only reveal the panel when hovering directly over it */
+    #controls:hover {
+      opacity: 1;
+    }
+    #controls label { 
+      display: block; 
+      margin-top: 10px; 
+    }
     #debugPanel {
       position: absolute; 
       bottom: 10px; 
@@ -35,27 +52,14 @@
   <canvas id="glCanvas"></canvas>
   <div id="controls">
     <!-- Default values as requested -->
-    <label>Gravity: <span id="gravityValue">9.8</span>
-      <input type="range" id="gravitySlider" min="0" max="30" step="0.1" value="9.8">
+    <label>Gravity: <span id="gravityValue">30</span>
+      <input type="range" id="gravitySlider" min="0" max="50" step="0.1" value="30">
     </label>
-    <!-- The UI friction value is set to 0.8, but note that friction between balls is explicitly disabled below -->
-    <label>Friction (Ball–Sphere): <span id="sphereFrictionValue">0.8</span>
-      <input type="range" id="sphereFrictionSlider" min="0" max="5" step="0.1" value="0.8">
-    </label>
-    <label>Yellow Ball Size: <span id="yellowSizeValue">0.5</span>
-      <input type="range" id="yellowSizeSlider" min="0.1" max="1.0" step="0.1" value="0.5">
-    </label>
-    <label>Blue Ball Size: <span id="blueSizeValue">0.4</span>
-      <input type="range" id="blueSizeSlider" min="0.1" max="1.0" step="0.1" value="0.4">
-    </label>
-    <label>Yellow Bounce: <span id="yellowBounceValue">1.0</span>
-      <input type="range" id="yellowBounceSlider" min="0" max="1" step="0.05" value="1.0">
-    </label>
-    <label>Blue Bounce: <span id="blueBounceValue">0.4</span>
-      <input type="range" id="blueBounceSlider" min="0" max="1" step="0.05" value="0.4">
+    <label>Friction (Ball–Sphere): <span id="sphereFrictionValue">8</span>
+      <input type="range" id="sphereFrictionSlider" min="0" max="8" step="0.1" value="8">
     </label>
     <label>Sphere Rotation Speed: <span id="rotationValue">30.0</span>
-      <input type="range" id="rotationSlider" min="0" max="90" step="0.1" value="30.0">
+      <input type="range" id="rotationSlider" min="0" max="30" step="0.1" value="30.0">
     </label>
   </div>
   <div id="debugPanel">Debug info here</div>
@@ -82,7 +86,7 @@
     uniform mat4 uViewMatrix;
     uniform mat4 uProjectionMatrix;
     uniform mat3 uNormalMatrix;
-    uniform mat4 uLightMVP; // Per-object light-space transform
+    uniform mat4 uLightMVP;
     varying vec3 vNormal;
     varying vec3 vWorldPos;
     varying vec4 vShadowCoord;
@@ -111,14 +115,11 @@
       vec3 V = normalize(uCameraPos - vWorldPos);
       vec3 H = normalize(L + V);
       float spec = (diff > 0.0) ? pow(max(dot(N, H), 0.0), uShininess) : 0.0;
-      
-      // Shadow lookup:
       vec3 shadowCoord = vShadowCoord.xyz / vShadowCoord.w;
       shadowCoord = shadowCoord * 0.5 + 0.5;
       float shadowDepth = texture2D(uShadowMap, shadowCoord.xy).r;
       float bias = 0.005;
       float shadowFactor = (shadowCoord.z - bias > shadowDepth) ? 0.5 : 1.0;
-      
       float ambient = 0.8;
       vec3 color = ambient * uBaseColor.rgb + diff * uBaseColor.rgb + spec * vec3(1.0);
       color *= shadowFactor;
@@ -168,1123 +169,1055 @@
   </script>
 
   <script>
-  // ============================================================
-  // Basic Geometry and Utility Classes (unchanged)
-  // ============================================================
-  class AABB {
-    constructor(){
-      this.min = vec3.create();
-      this.max = vec3.create();
-    }
-    setFromSphere(pos, r){
-      this.min[0] = pos[0] - r;
-      this.min[1] = pos[1] - r;
-      this.min[2] = pos[2] - r;
-      this.max[0] = pos[0] + r;
-      this.max[1] = pos[1] + r;
-      this.max[2] = pos[2] + r;
-    }
-    overlaps(other){
-      if(this.max[0] < other.min[0]) return false;
-      if(this.min[0] > other.max[0]) return false;
-      if(this.max[1] < other.min[1]) return false;
-      if(this.min[1] > other.max[1]) return false;
-      if(this.max[2] < other.min[2]) return false;
-      if(this.min[2] > other.max[2]) return false;
-      return true;
-    }
-  }
-  class Util {
-    static clamp(v, minV, maxV){ return Math.min(Math.max(v, minV), maxV); }
-  }
-  class SphereMesh {
-    constructor(gl, radius = 1, slices = 32, stacks = 32){
-      this.gl = gl;
-      let pos = [], nor = [], triIdx = [], lineIdx = [];
-      for(let i = 0; i <= stacks; i++){
-        let phi = i * Math.PI / stacks;
-        let sinP = Math.sin(phi), cosP = Math.cos(phi);
-        for(let j = 0; j <= slices; j++){
-          let theta = j * 2 * Math.PI / slices;
-          let sinT = Math.sin(theta), cosT = Math.cos(theta);
-          let x = cosT * sinP, y = cosP, z = sinT * sinP;
-          pos.push(x * radius, y * radius, z * radius);
-          nor.push(x, y, z);
-        }
+    // ============================================================
+    // Basic Geometry and Utility Classes (unchanged)
+    // ============================================================
+    class AABB {
+      constructor(){
+        this.min = vec3.create();
+        this.max = vec3.create();
       }
-      for(let i = 0; i < stacks; i++){
-        for(let j = 0; j < slices; j++){
-          let first = i * (slices + 1) + j;
-          let second = first + (slices + 1);
-          triIdx.push(first, second, first + 1);
-          triIdx.push(second, second + 1, first + 1);
-        }
+      setFromSphere(pos, r){
+        this.min[0] = pos[0] - r;
+        this.min[1] = pos[1] - r;
+        this.min[2] = pos[2] - r;
+        this.max[0] = pos[0] + r;
+        this.max[1] = pos[1] + r;
+        this.max[2] = pos[2] + r;
       }
-      for(let i = 0; i <= stacks; i++){
-        let row = i * (slices + 1);
-        for(let j = 0; j < slices; j++){
-          lineIdx.push(row + j, row + j + 1);
-        }
-      }
-      for(let j = 0; j <= slices; j++){
-        for(let i = 0; i < stacks; i++){
-          let idx1 = i * (slices + 1) + j;
-          let idx2 = (i + 1) * (slices + 1) + j;
-          lineIdx.push(idx1, idx2);
-        }
-      }
-      this.vertBuffer = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.vertBuffer);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(pos), gl.STATIC_DRAW);
-      this.normBuffer = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.normBuffer);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(nor), gl.STATIC_DRAW);
-      this.triIndexBuffer = gl.createBuffer();
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.triIndexBuffer);
-      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(triIdx), gl.STATIC_DRAW);
-      this.triCount = triIdx.length;
-      this.lineIndexBuffer = gl.createBuffer();
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.lineIndexBuffer);
-      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(lineIdx), gl.STATIC_DRAW);
-      this.lineCount = lineIdx.length;
-    }
-  }
-  function createProgram(gl, vsSource, fsSource){
-    function compileShader(src, type){
-      let sh = gl.createShader(type);
-      gl.shaderSource(sh, src);
-      gl.compileShader(sh);
-      if(!gl.getShaderParameter(sh, gl.COMPILE_STATUS)){
-        console.error("Shader error:", gl.getShaderInfoLog(sh));
-        return null;
-      }
-      return sh;
-    }
-    let vs = compileShader(vsSource, gl.VERTEX_SHADER);
-    let fs = compileShader(fsSource, gl.FRAGMENT_SHADER);
-    if(!vs || !fs) return null;
-    let prog = gl.createProgram();
-    gl.attachShader(prog, vs);
-    gl.attachShader(prog, fs);
-    gl.linkProgram(prog);
-    if(!gl.getProgramParameter(prog, gl.LINK_STATUS)){
-      console.error("Program link error:", gl.getProgramInfoLog(prog));
-      gl.deleteProgram(prog);
-      return null;
-    }
-    return prog;
-  }
-  // ============================================================
-  // Camera and Controller
-  // ============================================================
-  class Camera {
-    constructor(){
-      this.distance = 15;
-      this.azimuth = 0;
-      this.elevation = 0;
-      this.panX = 0;
-      this.panY = 0;
-      this.viewMatrix = mat4.create();
-      this.projMatrix = mat4.create();
-    }
-    update(gl){
-      let x = this.distance * Math.cos(this.elevation) * Math.sin(this.azimuth);
-      let y = this.distance * Math.sin(this.elevation);
-      let z = this.distance * Math.cos(this.elevation) * Math.cos(this.azimuth);
-      let eye = [x + this.panX, y + this.panY, z];
-      let center = [this.panX, this.panY, 0];
-      mat4.lookAt(this.viewMatrix, eye, center, [0,1,0]);
-      mat4.perspective(this.projMatrix, 45 * Math.PI / 180, gl.canvas.width / gl.canvas.height, 0.1, 100);
-    }
-  }
-  class CameraController {
-    constructor(canvas, camera){
-      this.canvas = canvas;
-      this.camera = camera;
-      this.dragging = false;
-      this.panning = false;
-      this.lastX = 0;
-      this.lastY = 0;
-      this._initEvents();
-    }
-    _initEvents(){
-      this.canvas.addEventListener("mousedown", (e) => {
-        if(e.button === 0) this.dragging = true; 
-        else if(e.button === 2) this.panning = true;
-        this.lastX = e.clientX;
-        this.lastY = e.clientY;
-      });
-      this.canvas.addEventListener("mouseup", (e) => {
-        this.dragging = false;
-        this.panning = false;
-      });
-      this.canvas.addEventListener("mouseleave", (e) => {
-        this.dragging = false;
-        this.panning = false;
-      });
-      this.canvas.addEventListener("contextmenu", (e) => { e.preventDefault(); });
-      this.canvas.addEventListener("mousemove", (e) => {
-        if(!this.dragging && !this.panning) return;
-        let dx = e.clientX - this.lastX;
-        let dy = e.clientY - this.lastY;
-        this.lastX = e.clientX;
-        this.lastY = e.clientY;
-        if(this.dragging){
-          let rotSpeed = 0.01;
-          this.camera.azimuth += dx * rotSpeed;
-          this.camera.elevation -= dy * rotSpeed;
-          let limit = Math.PI/2 - 0.01;
-          if(this.camera.elevation > limit) this.camera.elevation = limit;
-          if(this.camera.elevation < -limit) this.camera.elevation = -limit;
-        } else {
-          let panSpeed = 0.02;
-          this.camera.panX += -dx * panSpeed;
-          this.camera.panY += dy * panSpeed;
-        }
-      });
-      this.canvas.addEventListener("wheel", (e) => {
-        e.preventDefault();
-        let zoomSpeed = 0.02;
-        this.camera.distance += e.deltaY * zoomSpeed;
-        this.camera.distance = Math.max(2, Math.min(50, this.camera.distance));
-      }, {passive:false});
-    }
-  }
-  // ============================================================
-  // Global Scene Definition
-  // ============================================================
-  class Scene { }
-  Scene.current = null;
-  // ============================================================
-  // Extended Physics & Scene Definitions
-  // ============================================================
-  const EngineConfig = {
-    fixedDt: 1/240,           // 240 physics steps per second
-    solverIterations: 60,
-    positionIterations: 60,
-    integratorType: "semiImplicitEuler",
-    allow_sleeping: true,
-    sleepLinearThreshold: 0.001,
-    sleepAngularThreshold: 0.001,
-    sleepTimeThreshold: 0.3,
-    debugDraw: false
-  };
-  class PhysicsEngine {
-    constructor(scene){
-      this.scene = scene;
-      this.accumulator = 0;
-    }
-    step(realDeltaTime){
-      let dt = realDeltaTime;
-      this.accumulator += dt;
-      let stepSize = EngineConfig.fixedDt;
-      while(this.accumulator >= stepSize){
-        this.internalFixedStep(stepSize);
-        this.accumulator -= stepSize;
+      overlaps(other){
+        if(this.max[0] < other.min[0]) return false;
+        if(this.min[0] > other.max[0]) return false;
+        if(this.max[1] < other.min[1]) return false;
+        if(this.min[1] > other.max[1]) return false;
+        if(this.max[2] < other.min[2]) return false;
+        if(this.min[2] > other.max[2]) return false;
+        return true;
       }
     }
-    internalFixedStep(dt){
-      if(this.scene.onPreStep) this.scene.onPreStep(dt);
-      if(EngineConfig.allow_sleeping) this.scene.checkSleepingBodies(dt);
-      this.scene.postIntegrate(dt);
-      this.scene.contactManifolds.length = 0;
-      this.scene.dynamicTree.update();
-      this.scene.dynamicTree.broadPhasePairs(this.scene);
-      this.scene.narrowPhase();
-      for(let i = 0; i < EngineConfig.solverIterations; i++){
-        for(let man of this.scene.contactManifolds){
-          man.applyVelocityImpulses(dt);
-        }
-      }
-      for(let i = 0; i < EngineConfig.positionIterations; i++){
-        for(let man of this.scene.contactManifolds){
-          man.applyPositionCorrections();
-        }
-      }
-      this.scene.integrate(dt);
-      // Apply resting damping after integration.
-      applyRestingDamping(this.scene);
-      this.scene.debugInfo = this.scene.generateDebugInfo();
+    class Util {
+      static clamp(v, minV, maxV){ return Math.min(Math.max(v, minV), maxV); }
     }
-  }
-  class DynamicAABBTree {
-    constructor(){ this.nodes = []; }
-    update(){
-      this.nodes.length = 0;
-      if(!Scene.current) return;
-      for(let b of Scene.current.bodies){
-        let aabb = new AABB();
-        computeBodyAABB(b, aabb);
-        this.nodes.push({body: b, aabb});
-      }
-    }
-    broadPhasePairs(scene){
-      let arr = this.nodes;
-      for(let i = 0; i < arr.length; i++){
-        for(let j = i + 1; j < arr.length; j++){
-          if(arr[i].aabb.overlaps(arr[j].aabb)){
-            scene.buildContactManifold(arr[i].body, arr[j].body);
+    class SphereMesh {
+      constructor(gl, radius = 1, slices = 32, stacks = 32){
+        this.gl = gl;
+        let pos = [], nor = [], triIdx = [], lineIdx = [];
+        for(let i = 0; i <= stacks; i++){
+          let phi = i * Math.PI / stacks;
+          let sinP = Math.sin(phi), cosP = Math.cos(phi);
+          for(let j = 0; j <= slices; j++){
+            let theta = j * 2 * Math.PI / slices;
+            let sinT = Math.sin(theta), cosT = Math.cos(theta);
+            let x = cosT * sinP, y = cosP, z = sinT * sinP;
+            pos.push(x * radius, y * radius, z * radius);
+            nor.push(x, y, z);
           }
         }
+        for(let i = 0; i < stacks; i++){
+          for(let j = 0; j < slices; j++){
+            let first = i * (slices + 1) + j;
+            let second = first + (slices + 1);
+            triIdx.push(first, second, first + 1);
+            triIdx.push(second, second + 1, first + 1);
+          }
+        }
+        for(let i = 0; i <= stacks; i++){
+          let row = i * (slices + 1);
+          for(let j = 0; j < slices; j++){
+            lineIdx.push(row + j, row + j + 1);
+          }
+        }
+        for(let j = 0; j <= slices; j++){
+          for(let i = 0; i < stacks; i++){
+            let idx1 = i * (slices + 1) + j;
+            let idx2 = (i + 1) * (slices + 1) + j;
+            lineIdx.push(idx1, idx2);
+          }
+        }
+        this.vertBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vertBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(pos), gl.STATIC_DRAW);
+        this.normBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.normBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(nor), gl.STATIC_DRAW);
+        this.triIndexBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.triIndexBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(triIdx), gl.STATIC_DRAW);
+        this.triCount = triIdx.length;
+        this.lineIndexBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.lineIndexBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(lineIdx), gl.STATIC_DRAW);
+        this.lineCount = lineIdx.length;
       }
-      scene.detectContainerCollisions();
     }
-  }
-  function computeBodyAABB(body, out){
-    if(body.radius){
-      out.setFromSphere(body.position, body.radius);
-    } else {
-      out.setFromSphere(body.position, 1);
+    function createProgram(gl, vsSource, fsSource){
+      function compileShader(src, type){
+        let sh = gl.createShader(type);
+        gl.shaderSource(sh, src);
+        gl.compileShader(sh);
+        if(!gl.getShaderParameter(sh, gl.COMPILE_STATUS)){
+          console.error("Shader error:", gl.getShaderInfoLog(sh));
+          return null;
+        }
+        return sh;
+      }
+      let vs = compileShader(vsSource, gl.VERTEX_SHADER);
+      let fs = compileShader(fsSource, gl.FRAGMENT_SHADER);
+      if(!vs || !fs) return null;
+      let prog = gl.createProgram();
+      gl.attachShader(prog, vs);
+      gl.attachShader(prog, fs);
+      gl.linkProgram(prog);
+      if(!gl.getProgramParameter(prog, gl.LINK_STATUS)){
+        console.error("Program link error:", gl.getProgramInfoLog(prog));
+        gl.deleteProgram(prog);
+        return null;
+      }
+      return prog;
     }
-  }
-  class ExtendedContactManifold {
-    constructor(a, b){
-      this.bodyA = a; this.bodyB = b;
-      this.contacts = [];
-    }
-    applyVelocityImpulses(dt){
-      for(let c of this.contacts){
-        c.applyVelocityImpulse(dt);
+    // ============================================================
+    // Camera and Controller
+    // ============================================================
+    class Camera {
+      constructor(){
+        this.distance = 15;
+        this.azimuth = 0;
+        this.elevation = 0;
+        this.panX = 0;
+        this.panY = 0;
+        this.viewMatrix = mat4.create();
+        this.projMatrix = mat4.create();
+      }
+      update(gl){
+        let x = this.distance * Math.cos(this.elevation) * Math.sin(this.azimuth);
+        let y = this.distance * Math.sin(this.elevation);
+        let z = this.distance * Math.cos(this.elevation) * Math.cos(this.azimuth);
+        let eye = [x + this.panX, y + this.panY, z];
+        let center = [this.panX, this.panY, 0];
+        mat4.lookAt(this.viewMatrix, eye, center, [0,1,0]);
+        mat4.perspective(this.projMatrix, 45 * Math.PI / 180, gl.canvas.width / gl.canvas.height, 0.1, 100);
       }
     }
-    applyPositionCorrections(){
-      for(let c of this.contacts){
-        c.applyPositionCorrection();
+    class CameraController {
+      constructor(canvas, camera){
+        this.canvas = canvas;
+        this.camera = camera;
+        this.dragging = false;
+        this.panning = false;
+        this.lastX = 0;
+        this.lastY = 0;
+        this._initEvents();
+      }
+      _initEvents(){
+        this.canvas.addEventListener("mousedown", (e) => {
+          if(e.button === 0) this.dragging = true; 
+          else if(e.button === 2) this.panning = true;
+          this.lastX = e.clientX;
+          this.lastY = e.clientY;
+        });
+        this.canvas.addEventListener("mouseup", (e) => {
+          this.dragging = false;
+          this.panning = false;
+        });
+        this.canvas.addEventListener("mouseleave", (e) => {
+          this.dragging = false;
+          this.panning = false;
+        });
+        this.canvas.addEventListener("contextmenu", (e) => { e.preventDefault(); });
+        this.canvas.addEventListener("mousemove", (e) => {
+          if(!this.dragging && !this.panning) return;
+          let dx = e.clientX - this.lastX;
+          let dy = e.clientY - this.lastY;
+          this.lastX = e.clientX;
+          this.lastY = e.clientY;
+          if(this.dragging){
+            let rotSpeed = 0.01;
+            this.camera.azimuth += dx * rotSpeed;
+            this.camera.elevation -= dy * rotSpeed;
+            let limit = Math.PI/2 - 0.01;
+            if(this.camera.elevation > limit) this.camera.elevation = limit;
+            if(this.camera.elevation < -limit) this.camera.elevation = -limit;
+          } else {
+            let panSpeed = 0.02;
+            this.camera.panX += -dx * panSpeed;
+            this.camera.panY += dy * panSpeed;
+          }
+        });
+        this.canvas.addEventListener("wheel", (e) => {
+          e.preventDefault();
+          let zoomSpeed = 0.02;
+          this.camera.distance += e.deltaY * zoomSpeed;
+          this.camera.distance = Math.max(2, Math.min(50, this.camera.distance));
+        }, {passive:false});
       }
     }
-  }
-  function getContactOffset(body, n) {
-    let offset = vec3.create();
-    if(body.isContainer) {
-      vec3.scale(offset, n, -body.radius);
-    } else {
-      vec3.scale(offset, n, body.radius);
+    // ============================================================
+    // Global Scene Definition
+    // ============================================================
+    class Scene { }
+    Scene.current = null;
+    // ============================================================
+    // Extended Physics & Scene Definitions
+    // ============================================================
+    const EngineConfig = {
+      fixedDt: 1/240,
+      solverIterations: 60,
+      positionIterations: 60,
+      integratorType: "semiImplicitEuler",
+      allow_sleeping: true,
+      sleepLinearThreshold: 0.001,
+      sleepAngularThreshold: 0.001,
+      sleepTimeThreshold: 0.3,
+      debugDraw: false
+    };
+    class PhysicsEngine {
+      constructor(scene){
+        this.scene = scene;
+        this.accumulator = 0;
+      }
+      step(realDeltaTime){
+        let dt = realDeltaTime;
+        this.accumulator += dt;
+        let stepSize = EngineConfig.fixedDt;
+        while(this.accumulator >= stepSize){
+          this.internalFixedStep(stepSize);
+          this.accumulator -= stepSize;
+        }
+      }
+      internalFixedStep(dt){
+        if(this.scene.onPreStep) this.scene.onPreStep(dt);
+        if(EngineConfig.allow_sleeping) this.scene.checkSleepingBodies(dt);
+        this.scene.postIntegrate(dt);
+        this.scene.contactManifolds.length = 0;
+        this.scene.dynamicTree.update();
+        this.scene.dynamicTree.broadPhasePairs(this.scene);
+        this.scene.narrowPhase();
+        for(let i = 0; i < EngineConfig.solverIterations; i++){
+          for(let man of this.scene.contactManifolds){
+            man.applyVelocityImpulses(dt);
+          }
+        }
+        for(let i = 0; i < EngineConfig.positionIterations; i++){
+          for(let man of this.scene.contactManifolds){
+            man.applyPositionCorrections();
+          }
+        }
+        this.scene.integrate(dt);
+        applyRestingDamping(this.scene);
+        this.scene.debugInfo = this.scene.generateDebugInfo();
+      }
     }
-    return offset;
-  }
-  class ExtendedContactPoint {
-    constructor(){
-      this.bodyA = null;
-      this.bodyB = null;
-      this.normal = vec3.fromValues(0,1,0);
-      this.penetration = 0;
-      this.restitution = 0.55;
-      this.friction = 0.8;
+    class DynamicAABBTree {
+      constructor(){ this.nodes = []; }
+      update(){
+        this.nodes.length = 0;
+        if(!Scene.current) return;
+        for(let b of Scene.current.bodies){
+          let aabb = new AABB();
+          computeBodyAABB(b, aabb);
+          this.nodes.push({body: b, aabb});
+        }
+      }
+      broadPhasePairs(scene){
+        let arr = this.nodes;
+        for(let i = 0; i < arr.length; i++){
+          for(let j = i + 1; j < arr.length; j++){
+            if(arr[i].aabb.overlaps(arr[j].aabb)){
+              scene.buildContactManifold(arr[i].body, arr[j].body);
+            }
+          }
+        }
+        scene.detectContainerCollisions();
+      }
     }
-    applyVelocityImpulse(dt){
-      let bA = this.bodyA, bB = this.bodyB;
-      if(!bA || !bB) return;
-      if(bA.isSleeping || bB.isSleeping) return;
-      const EPSILON = 0.001;
-      const MAX_IMPULSE = 0.5;
-      const collisionImpulseScale = 0.7;
-      
-      // Container-ball collisions:
-      if(bA.isContainer || bB.isContainer) {
-        let container = bA.isContainer ? bA : bB;
-        let ball = bA.isContainer ? bB : bA;
-        let n = vec3.create();
-        vec3.normalize(n, ball.position);
-        vec3.scale(n, n, -1);
-        let offsetBall = vec3.create();
-        vec3.scale(offsetBall, n, ball.radius);
-        let offsetCont = vec3.create();
-        vec3.scale(offsetCont, n, -container.radius);
-        let vBall = vec3.create(), vCont = vec3.create(), temp = vec3.create();
-        vec3.cross(temp, ball.angularVelocity, offsetBall);
-        vec3.add(vBall, ball.velocity, temp);
-        vec3.cross(temp, container.angularVelocity, offsetCont);
-        vec3.copy(vCont, temp);
+    function computeBodyAABB(body, out){
+      if(body.radius){
+        out.setFromSphere(body.position, body.radius);
+      } else {
+        out.setFromSphere(body.position, 1);
+      }
+    }
+    class ExtendedContactManifold {
+      constructor(a, b){
+        this.bodyA = a; this.bodyB = b;
+        this.contacts = [];
+      }
+      applyVelocityImpulses(dt){
+        for(let c of this.contacts){
+          c.applyVelocityImpulse(dt);
+        }
+      }
+      applyPositionCorrections(){
+        for(let c of this.contacts){
+          c.applyPositionCorrection();
+        }
+      }
+    }
+    function getContactOffset(body, n) {
+      let offset = vec3.create();
+      if(body.isContainer) {
+        vec3.scale(offset, n, -body.radius);
+      } else {
+        vec3.scale(offset, n, body.radius);
+      }
+      return offset;
+    }
+    class ExtendedContactPoint {
+      constructor(){
+        this.bodyA = null;
+        this.bodyB = null;
+        this.normal = vec3.fromValues(0,1,0);
+        this.penetration = 0;
+        this.restitution = 0.55;
+        this.friction = 0.8;
+      }
+      applyVelocityImpulse(dt) {
+        let bA = this.bodyA, bB = this.bodyB;
+        if (!bA || !bB) return;
+        if (bA.isSleeping || bB.isSleeping) return;
+        const EPSILON = 0.001;
+        
+        // --- Container-ball collisions ---
+        if (bA.isContainer || bB.isContainer) {
+          let container = bA.isContainer ? bA : bB;
+          let ball = bA.isContainer ? bB : bA;
+          let n = vec3.create();
+          vec3.normalize(n, ball.position);
+          vec3.scale(n, n, -1);
+          let offsetBall = vec3.create();
+          vec3.scale(offsetBall, n, ball.radius);
+          let offsetCont = vec3.create();
+          vec3.scale(offsetCont, n, -container.radius);
+          let vBall = vec3.create(), vCont = vec3.create(), temp = vec3.create();
+          vec3.cross(temp, ball.angularVelocity, offsetBall);
+          vec3.add(vBall, ball.velocity, temp);
+          vec3.cross(temp, container.angularVelocity, offsetCont);
+          vec3.copy(vCont, temp);
+          let rv = vec3.create();
+          vec3.sub(rv, vBall, vCont);
+          let velAlongNormal = vec3.dot(rv, n);
+          if (Math.abs(velAlongNormal) < EPSILON) return;
+          let e = 0.0; // no bounce off container
+          let j = -(1 + e) * velAlongNormal / ball.invMass;
+          if (Math.abs(j) > 0.05) { 
+            j = 0.05 * Math.sign(j);
+          }
+          let impulse = vec3.create();
+          vec3.scale(impulse, n, j);
+          vec3.scaleAndAdd(ball.velocity, ball.velocity, impulse, ball.invMass);
+          
+          // --- FRICTION for container-ball collisions ---
+          let normalComponent = vec3.create();
+          vec3.scale(normalComponent, n, velAlongNormal);
+          let tangent = vec3.create();
+          vec3.sub(tangent, rv, normalComponent);
+          let tLen = vec3.length(tangent);
+          if (tLen > EPSILON) {
+            vec3.scale(tangent, tangent, 1 / tLen);
+            let mu = Math.max(ball.friction, container.friction);
+            let j_t = -vec3.dot(rv, tangent) / ball.invMass;
+            j_t = Util.clamp(j_t, -mu * Math.abs(j), mu * Math.abs(j));
+            let frictionImpulse = vec3.create();
+            vec3.scale(frictionImpulse, tangent, j_t);
+            vec3.scaleAndAdd(ball.velocity, ball.velocity, frictionImpulse, ball.invMass);
+            let I_ball = (2/5) * ball.mass * ball.radius * ball.radius;
+            if (I_ball > EPSILON) {
+              let torque = vec3.create();
+              vec3.cross(torque, offsetBall, frictionImpulse);
+              vec3.scaleAndAdd(ball.angularVelocity, ball.angularVelocity, torque, 1 / I_ball);
+            }
+          }
+          return;
+        }
+        
+        // --- Sphere-sphere (ball-ball) collisions ---
+        let n = this.normal;
+        let offsetA = getContactOffset(bA, n);
+        let offsetB = getContactOffset(bB, n);
+        let vA = vec3.create(), vB = vec3.create(), temp = vec3.create();
+        vec3.cross(temp, bA.angularVelocity, offsetA);
+        vec3.add(vA, bA.velocity, temp);
+        vec3.cross(temp, bB.angularVelocity, offsetB);
+        vec3.add(vB, bB.velocity, temp);
         let rv = vec3.create();
-        vec3.sub(rv, vBall, vCont);
+        vec3.sub(rv, vA, vB);
         let velAlongNormal = vec3.dot(rv, n);
-        if(Math.abs(velAlongNormal) < EPSILON) return;
-        let e = 0.0;
-        let j = -(1+e)*velAlongNormal / ball.invMass;
-        if(Math.abs(j) > MAX_IMPULSE) { j = MAX_IMPULSE * Math.sign(j); }
+        if (Math.abs(velAlongNormal) < EPSILON) return;
+        
+        let e = (bA.restitution + bB.restitution) / 2.0;
+        const highVelThreshold = 2.0;
+        if (Math.abs(velAlongNormal) > highVelThreshold) {
+          e = e * (highVelThreshold / Math.abs(velAlongNormal));
+        }
+        let invMassSum = bA.invMass + bB.invMass;
+        let j = -(1 + e) * velAlongNormal / invMassSum;
+        if (Math.abs(j) > 0.05) {
+          j = 0.05 * Math.sign(j);
+        }
+        j *= 0.7;
+        const lowVelThreshold = 0.1;
+        if (Math.abs(velAlongNormal) < lowVelThreshold) {
+          let scaleFactor = Math.abs(velAlongNormal) / lowVelThreshold;
+          j *= scaleFactor;
+        }
         let impulse = vec3.create();
         vec3.scale(impulse, n, j);
-        vec3.scaleAndAdd(ball.velocity, ball.velocity, impulse, ball.invMass);
+        vec3.scaleAndAdd(bA.velocity, bA.velocity, impulse, bA.invMass);
+        vec3.scaleAndAdd(bB.velocity, bB.velocity, impulse, -bB.invMass);
+        
+        // --- Friction impulse for ball-ball collisions ---
         let normalComponent = vec3.create();
         vec3.scale(normalComponent, n, velAlongNormal);
         let tangent = vec3.create();
         vec3.sub(tangent, rv, normalComponent);
         let tLen = vec3.length(tangent);
-        if(tLen > EPSILON) {
-          vec3.scale(tangent, tangent, 1/tLen);
-          let mu = Math.max(ball.friction, container.friction);
-          // Scale friction based on vertical position:
-          let h = ball.position[1] - container.position[1];
-          let R = container.radius;
-          let frictionFactor = 1 - ((h + R) / (2 * R));
-          mu = mu * frictionFactor;
-          let j_t = -vec3.dot(rv, tangent) / ball.invMass;
+        if (tLen > EPSILON) {
+          vec3.scale(tangent, tangent, 1 / tLen);
+          let mu = Math.max(bA.friction, bB.friction);
+          let j_t = -vec3.dot(rv, tangent) / invMassSum;
           j_t = Util.clamp(j_t, -mu * Math.abs(j), mu * Math.abs(j));
           let frictionImpulse = vec3.create();
           vec3.scale(frictionImpulse, tangent, j_t);
-          vec3.scaleAndAdd(ball.velocity, ball.velocity, frictionImpulse, ball.invMass);
-          let I_ball = (2/5)*ball.mass*ball.radius*ball.radius;
-          if(I_ball > EPSILON) {
-            let torque = vec3.create();
-            vec3.cross(torque, offsetBall, frictionImpulse);
-            vec3.scaleAndAdd(ball.angularVelocity, ball.angularVelocity, torque, 1/I_ball);
-          }
-        }
-        return;
-      }
-      
-      // Sphere-sphere collisions:
-      let n = this.normal;
-      let offsetA = getContactOffset(bA, n);
-      let offsetB = getContactOffset(bB, n);
-      let vA = vec3.create(), vB = vec3.create(), temp = vec3.create();
-      vec3.cross(temp, bA.angularVelocity, offsetA);
-      vec3.add(vA, bA.velocity, temp);
-      vec3.cross(temp, bB.angularVelocity, offsetB);
-      vec3.add(vB, bB.velocity, temp);
-      let rv = vec3.create();
-      vec3.sub(rv, vA, vB);
-      let velAlongNormal = vec3.dot(rv, n);
-      if(Math.abs(velAlongNormal) < EPSILON) return;
-      
-      // Compute normal impulse using average restitution.
-      let e = (bA.restitution + bB.restitution) / 2.0;
-      let invMassSum = bA.invMass + bB.invMass;
-      let j = -(1+e)*velAlongNormal / invMassSum;
-      if(Math.abs(j) > MAX_IMPULSE) { j = MAX_IMPULSE * Math.sign(j); }
-      j *= collisionImpulseScale;
-      let impulse = vec3.create();
-      vec3.scale(impulse, n, j);
-      if(!bA.isContainer) vec3.scaleAndAdd(bA.velocity, bA.velocity, impulse, bA.invMass);
-      if(!bB.isContainer) vec3.scaleAndAdd(bB.velocity, bB.velocity, impulse, -bB.invMass);
-      
-      // If both bodies are balls (neither is the container), do NOT apply any friction.
-      if(!bA.isContainer && !bB.isContainer) return;
-      
-      // Otherwise (if one body is the container), compute friction impulse.
-      let normalComponent = vec3.create();
-      vec3.scale(normalComponent, n, velAlongNormal);
-      let tangent = vec3.create();
-      vec3.sub(tangent, rv, normalComponent);
-      let tLen = vec3.length(tangent);
-      if(tLen > EPSILON) {
-        vec3.scale(tangent, tangent, 1/tLen);
-        let mu = Math.max(bA.friction, bB.friction);
-        let j_t = -vec3.dot(rv, tangent) / invMassSum;
-        j_t = Util.clamp(j_t, -mu * Math.abs(j), mu * Math.abs(j));
-        let frictionImpulse = vec3.create();
-        vec3.scale(frictionImpulse, tangent, j_t);
-        if(!bA.isContainer) vec3.scaleAndAdd(bA.velocity, bA.velocity, frictionImpulse, bA.invMass);
-        if(!bB.isContainer) vec3.scaleAndAdd(bB.velocity, bB.velocity, frictionImpulse, -bB.invMass);
-        if(!bA.isContainer) {
-          let I_A = (2/5)*bA.mass*bA.radius*bA.radius;
-          if(I_A > EPSILON) {
+          vec3.scaleAndAdd(bA.velocity, bA.velocity, frictionImpulse, bA.invMass);
+          vec3.scaleAndAdd(bB.velocity, bB.velocity, frictionImpulse, -bB.invMass);
+          // Optionally, if you wish to have torque generated by ball-ball friction, add:
+          let I_A = (2/5) * bA.mass * bA.radius * bA.radius;
+          if (I_A > EPSILON) {
             let torqueA = vec3.create();
             vec3.cross(torqueA, offsetA, frictionImpulse);
-            vec3.scaleAndAdd(bA.angularVelocity, bA.angularVelocity, torqueA, 1/I_A);
+            vec3.scaleAndAdd(bA.angularVelocity, bA.angularVelocity, torqueA, 1 / I_A);
           }
-        }
-        if(!bB.isContainer) {
-          let I_B = (2/5)*bB.mass*bB.radius*bB.radius;
-          if(I_B > EPSILON) {
+          let I_B = (2/5) * bB.mass * bB.radius * bB.radius;
+          if (I_B > EPSILON) {
             let torqueB = vec3.create();
             vec3.cross(torqueB, offsetB, frictionImpulse);
-            vec3.scaleAndAdd(bB.angularVelocity, bB.angularVelocity, torqueB, -1/I_B);
+            vec3.scaleAndAdd(bB.angularVelocity, bB.angularVelocity, torqueB, -1 / I_B);
           }
         }
       }
+      applyPositionCorrection() {
+        let bA = this.bodyA, bB = this.bodyB;
+        if (!bA || !bB) return;
+        if (bA.isSleeping || bB.isSleeping) return;
+        let invM1 = bA.invMass, invM2 = bB.invMass;
+        let n = this.normal;
+        let slop = 0.0005;
+        let pen = this.penetration - slop;
+        if (pen < 0) pen = 0;
+        let totalInv = invM1 + invM2;
+        if (totalInv < 1e-12) return;
+        let percent = 0.5;
+        let corr = (percent * pen) / totalInv;
+        vec3.scaleAndAdd(bA.position, bA.position, n, -corr * invM1);
+        vec3.scaleAndAdd(bB.position, bB.position, n, corr * invM2);
+      }
     }
-    applyPositionCorrection(){
-      let bA = this.bodyA, bB = this.bodyB;
-      if(!bA || !bB) return;
-      if(bA.isSleeping || bB.isSleeping) return;
-      let invM1 = bA.invMass, invM2 = bB.invMass;
-      let n = this.normal;
-      let slop = 0.01;
-      let pen = this.penetration - slop;
-      if(pen < 0) pen = 0;
-      let totalInv = invM1 + invM2;
-      if(totalInv < 1e-12) return;
-      let percent = 0.5;
-      let corr = (percent * pen) / totalInv;
-      vec3.scaleAndAdd(bA.position, bA.position, n, -corr * invM1);
-      vec3.scaleAndAdd(bB.position, bB.position, n, corr * invM2);
-    }
-  }
-  class ExtendedScene {
-    constructor(){
-      this.bodies = [];
-      this.contactManifolds = [];
-      this.dynamicTree = new DynamicAABBTree();
-      this.debugInfo = "";
-      this.onPreStep = null;
-      this.onPostStep = null;
-    }
-    addBody(body){
-      this.bodies.push(body);
-      body.scene = this;
-    }
-    detectContainerCollisions(){
-      for(let c of this.bodies){
-        if(!(c instanceof Container)) continue;
-        for(let b of this.bodies){
-          if(b === c) continue;
-          if(b instanceof Container) continue;
-          this.buildSphereContainerManifold(b, c);
+    class ExtendedScene {
+      constructor(){
+        this.bodies = [];
+        this.contactManifolds = [];
+        this.dynamicTree = new DynamicAABBTree();
+        this.debugInfo = "";
+        this.onPreStep = null;
+        this.onPostStep = null;
+      }
+      addBody(body){
+        this.bodies.push(body);
+        body.scene = this;
+      }
+      detectContainerCollisions(){
+        for(let c of this.bodies){
+          if(!(c instanceof Container)) continue;
+          for(let b of this.bodies){
+            if(b === c) continue;
+            if(b instanceof Container) continue;
+            this.buildSphereContainerManifold(b, c);
+          }
         }
       }
-    }
-    buildSphereContainerManifold(ball, container){
-      let dx = ball.position[0], dy = ball.position[1], dz = ball.position[2];
-      let distSq = dx*dx + dy*dy + dz*dz;
-      let limit = container.radius - ball.radius;
-      if(distSq > limit*limit){
-        let dist = Math.sqrt(distSq);
-        let normal = vec3.create();
-        vec3.subtract(normal, container.position, ball.position);
-        vec3.normalize(normal, normal);
-        let pen = dist - limit;
-        let man = new ExtendedContactManifold(container, ball);
-        let cp = new ExtendedContactPoint();
-        cp.bodyA = container;
-        cp.bodyB = ball;
-        cp.normal = normal;
-        cp.penetration = pen;
-        cp.restitution = Math.min(ball.restitution, container.restitution);
-        cp.friction = Math.max(ball.friction, container.friction);
-        man.contacts.push(cp);
-        this.contactManifolds.push(man);
-      }
-    }
-    buildContactManifold(a, b){
-      if(a instanceof Container || b instanceof Container) return;
-      if(a.radius && b.radius){
-        let dx = b.position[0] - a.position[0];
-        let dy = b.position[1] - a.position[1];
-        let dz = b.position[2] - a.position[2];
+      buildSphereContainerManifold(ball, container){
+        let dx = ball.position[0], dy = ball.position[1], dz = ball.position[2];
         let distSq = dx*dx + dy*dy + dz*dz;
-        let sumR = a.radius + b.radius;
-        if(distSq > sumR*sumR) return;
-        let dist = Math.sqrt(distSq);
-        let normal = vec3.fromValues(0,1,0);
-        let pen = sumR - dist;
-        if(dist > 1e-8){
-          normal[0] = dx/dist;
-          normal[1] = dy/dist;
-          normal[2] = dz/dist;
-        }
-        let man = new ExtendedContactManifold(a, b);
-        let cp = new ExtendedContactPoint();
-        cp.bodyA = a;
-        cp.bodyB = b;
-        cp.normal = normal;
-        cp.penetration = pen;
-        cp.restitution = Math.min(a.restitution, b.restitution);
-        cp.friction = Math.max(a.friction, b.friction);
-        man.contacts.push(cp);
-        this.contactManifolds.push(man);
-      }
-    }
-    narrowPhase(){ }
-    integrate(dt){
-      // Update positions and orientations for all bodies
-      for(let b of this.bodies){
-        if(b.isKinematic || b.isSleeping) continue;
-        let linearDamping = 0.98;
-        vec3.scale(b.velocity, b.velocity, linearDamping);
-        const maxVelocity = 10.0;
-        if(vec3.length(b.velocity) > maxVelocity){
-          vec3.normalize(b.velocity, b.velocity);
-          vec3.scale(b.velocity, b.velocity, maxVelocity);
-        }
-        vec3.scaleAndAdd(b.position, b.position, b.velocity, dt);
-        let wLen = vec3.length(b.angularVelocity);
-        if(wLen > 1e-8){
-          let axis = vec3.clone(b.angularVelocity);
-          vec3.scale(axis, axis, 1.0/wLen);
-          let angle = wLen * dt;
-          let dq = quat.create();
-          quat.setAxisAngle(dq, axis, angle);
-          quat.multiply(b.orientation, dq, b.orientation);
-          quat.normalize(b.orientation, b.orientation);
-          let angularDamping = 0.98;
-          vec3.scale(b.angularVelocity, b.angularVelocity, angularDamping);
+        let limit = container.radius - ball.radius;
+        if(distSq > limit*limit){
+          let dist = Math.sqrt(distSq);
+          let normal = vec3.create();
+          vec3.subtract(normal, container.position, ball.position);
+          vec3.normalize(normal, normal);
+          let pen = dist - limit;
+          let man = new ExtendedContactManifold(container, ball);
+          let cp = new ExtendedContactPoint();
+          cp.bodyA = container;
+          cp.bodyB = ball;
+          cp.normal = normal;
+          cp.penetration = pen;
+          cp.restitution = Math.min(ball.restitution, container.restitution);
+          cp.friction = Math.max(ball.friction, container.friction);
+          man.contacts.push(cp);
+          this.contactManifolds.push(man);
         }
       }
-      
-      // Preserve the -y (vertical) velocity so gravity always applies.
-      const container = this.bodies.find(b => b.isContainer);
-      if (container) {
-        for(let b of this.bodies) {
-          if(b.isContainer || b.isSleeping) continue;
-          let r = vec3.length(b.position);
-          let restingDist = container.radius - b.radius;
-          if(Math.abs(r - restingDist) < 0.01) {
-            let radial = vec3.create();
-            vec3.normalize(radial, b.position);
-            let vRad = vec3.dot(b.velocity, radial);
-            let vTang = vec3.create();
-            vec3.scale(vTang, radial, vRad);
-            vec3.sub(vTang, b.velocity, vTang);
-            if(vec3.length(vTang) < 0.0005) {
-              let newVel = vec3.scale(vec3.create(), radial, vRad);
-              newVel[1] = b.velocity[1];
-              b.velocity = newVel;
+      buildContactManifold(a, b){
+        if(a instanceof Container || b instanceof Container) return;
+        if(a.radius && b.radius){
+          let dx = b.position[0] - a.position[0];
+          let dy = b.position[1] - a.position[1];
+          let dz = b.position[2] - a.position[2];
+          let distSq = dx*dx + dy*dy + dz*dz;
+          let sumR = a.radius + b.radius;
+          if(distSq > sumR*sumR) return;
+          let dist = Math.sqrt(distSq);
+          let normal = vec3.fromValues(0,1,0);
+          let pen = sumR - dist;
+          if(dist > 1e-8){
+            normal[0] = dx/dist;
+            normal[1] = dy/dist;
+            normal[2] = dz/dist;
+          }
+          let man = new ExtendedContactManifold(a, b);
+          let cp = new ExtendedContactPoint();
+          cp.bodyA = a;
+          cp.bodyB = b;
+          cp.normal = normal;
+          cp.penetration = pen;
+          cp.restitution = Math.min(a.restitution, b.restitution);
+          cp.friction = Math.max(a.friction, b.friction);
+          man.contacts.push(cp);
+          this.contactManifolds.push(man);
+        }
+      }
+      narrowPhase(){ }
+      integrate(dt){
+        for(let b of this.bodies){
+          if(b.isKinematic || b.isSleeping) continue;
+          let linearDamping = 0.98;
+          vec3.scale(b.velocity, b.velocity, linearDamping);
+          const maxVelocity = 10.0;
+          if(vec3.length(b.velocity) > maxVelocity){
+            vec3.normalize(b.velocity, b.velocity);
+            vec3.scale(b.velocity, b.velocity, maxVelocity);
+          }
+          vec3.scaleAndAdd(b.position, b.position, b.velocity, dt);
+          let wLen = vec3.length(b.angularVelocity);
+          if(wLen > 1e-8){
+            let axis = vec3.clone(b.angularVelocity);
+            vec3.scale(axis, axis, 1.0/wLen);
+            let angle = wLen * dt;
+            let dq = quat.create();
+            quat.setAxisAngle(dq, axis, angle);
+            quat.multiply(b.orientation, dq, b.orientation);
+            quat.normalize(b.orientation, b.orientation);
+            let angularDamping = 0.98;
+            vec3.scale(b.angularVelocity, b.angularVelocity, angularDamping);
+          }
+        }
+        const container = this.bodies.find(b => b.isContainer);
+        if (container) {
+          for (let b of this.bodies) {
+            if(b.isContainer || b.isSleeping) continue;
+            let r = vec3.length(b.position);
+            let restingDist = container.radius - b.radius;
+            if(Math.abs(r - restingDist) < 0.01) {
+              if (b.position[1] < 4.0) {
+                let radial = vec3.create();
+                vec3.normalize(radial, b.position);
+                let vRad = vec3.dot(b.velocity, radial);
+                let vTang = vec3.create();
+                vec3.scale(vTang, radial, vRad);
+                vec3.sub(vTang, b.velocity, vTang);
+                if (vec3.length(vTang) < 0.0005) {
+                  let newVel = vec3.scale(vec3.create(), radial, vRad);
+                  newVel[1] = b.velocity[1];
+                  b.velocity = newVel;
+                }
+              }
             }
           }
         }
       }
-    }
-    postIntegrate(dt){
-      for(let b of this.bodies){
-        if(b.isKinematic && b instanceof Container){
-          b.updateKinematic(dt);
-        }
-      }
-    }
-    generateDebugInfo(){
-      return `Bodies=${this.bodies.length}, Contacts=${this.contactManifolds.length}`;
-    }
-    checkSleepingBodies(dt){
-      for(let b of this.bodies){
-        if(b.isKinematic) continue;
-        let speed = vec3.length(b.velocity);
-        let wspeed = vec3.length(b.angularVelocity);
-        if(speed < EngineConfig.sleepLinearThreshold && wspeed < EngineConfig.sleepAngularThreshold){
-          b.sleepTimer += dt;
-          if(b.sleepTimer > EngineConfig.sleepTimeThreshold){
-            b.isSleeping = true;
-            vec3.set(b.velocity, 0, 0, 0);
-            vec3.set(b.angularVelocity, 0, 0, 0);
+      postIntegrate(dt){
+        for(let b of this.bodies){
+          if(b.isKinematic && b instanceof Container){
+            b.updateKinematic(dt);
           }
-        } else {
-          b.sleepTimer = 0;
-          b.isSleeping = false;
+        }
+      }
+      generateDebugInfo(){
+        return `Bodies=${this.bodies.length}, Contacts=${this.contactManifolds.length}`;
+      }
+      checkSleepingBodies(dt){
+        for(let b of this.bodies){
+          if(b.isKinematic) continue;
+          let speed = vec3.length(b.velocity);
+          let wspeed = vec3.length(b.angularVelocity);
+          if(speed < EngineConfig.sleepLinearThreshold && wspeed < EngineConfig.sleepAngularThreshold){
+            b.sleepTimer += dt;
+            if(b.sleepTimer > EngineConfig.sleepTimeThreshold){
+              b.isSleeping = true;
+              vec3.set(b.velocity, 0, 0, 0);
+              vec3.set(b.angularVelocity, 0, 0, 0);
+            }
+          } else {
+            b.sleepTimer = 0;
+            b.isSleeping = false;
+          }
         }
       }
     }
-  }
-  class ExtendedBodySphere {
-    constructor(radius = 0.5){
-      this.position = vec3.create();
-      this.orientation = quat.create();
-      this.velocity = vec3.create();
-      this.angularVelocity = vec3.create();
-      this.mass = radius * radius * radius;
-      this.invMass = (this.mass > 1e-8 ? 1/this.mass : 0);
-      this.radius = radius;
-      this.isContainer = false;
-      this.isKinematic = false;
-      this.restitution = 0.55;
-      this.friction = 0.8;
-      this.rollingFriction = 0.02;
-      this.isSleeping = false;
-      this.sleepTimer = 0;
-      this.scene = null;
-    }
-  }
-  class Container {
-    constructor(radius = 5){
-      this.position = vec3.create();
-      this.orientation = quat.create();
-      this.velocity = vec3.create();
-      let randomDir = vec3.fromValues(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5);
-      if(vec3.length(randomDir) < 1e-6){
-        vec3.set(randomDir, 0, 1, 0);
+    class ExtendedBodySphere {
+      constructor(radius = 0.5){
+        this.position = vec3.create();
+        this.orientation = quat.create();
+        this.velocity = vec3.create();
+        this.angularVelocity = vec3.create();
+        this.mass = radius * radius * radius;
+        this.invMass = (this.mass > 1e-8 ? 1/this.mass : 0);
+        this.radius = radius;
+        this.isContainer = false;
+        this.isKinematic = false;
+        this.restitution = 0.55;
+        this.friction = 0.8;
+        this.rollingFriction = 0.02;
+        this.isSleeping = false;
+        this.sleepTimer = 0;
+        this.scene = null;
       }
-      vec3.normalize(randomDir, randomDir);
-      this.angularVelocity = vec3.create();
-      vec3.scale(this.angularVelocity, randomDir, 1.0);
-      this.mass = 1e9;
-      this.invMass = 0;
-      this.radius = radius;
-      this.isContainer = true;
-      this.isKinematic = true;
-      this.restitution = 0.5;
-      this.friction = 1.0;
-      this.rollingFriction = 0;
-      this.isSleeping = false;
-      this.sleepTimer = 0;
-      // Default rotationSpeed will be overridden by UI.
-      this.rotationSpeed = 1;
-      this.scene = null;
-      this.nextAngularUpdate = 0;
     }
-    updateKinematic(dt){
-      // Randomize the interval between 1 and 5 seconds.
-      if(!this.nextAngularUpdate || performance.now() > this.nextAngularUpdate) {
+    class Container {
+      constructor(radius = 5){
+        this.position = vec3.create();
+        this.orientation = quat.create();
+        this.velocity = vec3.create();
         let randomDir = vec3.fromValues(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5);
         if(vec3.length(randomDir) < 1e-6){
           vec3.set(randomDir, 0, 1, 0);
         }
         vec3.normalize(randomDir, randomDir);
-        vec3.scale(randomDir, randomDir, this.rotationSpeed);
-        this.angularVelocity = randomDir;
-        this.nextAngularUpdate = performance.now() + 1000 + Math.random() * 4000;
+        this.angularVelocity = vec3.create();
+        vec3.scale(this.angularVelocity, randomDir, 1.0);
+        this.mass = 1e9;
+        this.invMass = 0;
+        this.radius = radius;
+        this.isContainer = true;
+        this.isKinematic = true;
+        this.restitution = 0.5;
+        this.friction = 1.0;
+        this.rollingFriction = 0;
+        this.isSleeping = false;
+        this.sleepTimer = 0;
+        this.rotationSpeed = 1;
+        this.scene = null;
+        this.nextAngularUpdate = 0;
       }
-      let wLen = vec3.length(this.angularVelocity);
-      if(wLen > 1e-8){
-        let axis = vec3.clone(this.angularVelocity);
-        vec3.normalize(axis, axis);
-        let angle = wLen * dt;
-        let dq = quat.create();
-        quat.setAxisAngle(dq, axis, angle);
-        quat.multiply(this.orientation, dq, this.orientation);
-        quat.normalize(this.orientation, this.orientation);
-      }
-    }
-  }
-  // ============================================================
-  // SHADOW MAPPING SETUP
-  // ============================================================
-  function initShadowMap(gl, width, height) {
-    let shadowFramebuffer = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, shadowFramebuffer);
-    let shadowTexture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, shadowTexture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, shadowTexture, 0);
-    let renderbuffer = gl.createRenderbuffer();
-    gl.bindRenderbuffer(gl.RENDERBUFFER, renderbuffer);
-    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
-    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, renderbuffer);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    return { framebuffer: shadowFramebuffer, texture: shadowTexture };
-  }
-  // ============================================================
-  // Resting Damping Function (preserving constant -y gravity)
-  // ============================================================
-  function applyRestingDamping(scene) {
-    const container = scene.bodies.find(b => b.isContainer);
-    if (!container) return;
-    for(let b of scene.bodies) {
-      if(b.isContainer || b.isSleeping) continue;
-      let r = vec3.length(b.position);
-      let desiredRest = container.radius - b.radius;
-      if(Math.abs(r - desiredRest) < 0.01) {
-        let radial = vec3.create();
-        vec3.normalize(radial, b.position);
-        let vRad = vec3.dot(b.velocity, radial);
-        let vTang = vec3.create();
-        vec3.scale(vTang, radial, vRad);
-        vec3.sub(vTang, b.velocity, vTang);
-        if(vec3.length(vTang) < 0.0005) {
-          let newVel = vec3.scale(vec3.create(), radial, vRad);
-          newVel[1] = b.velocity[1];
-          b.velocity = newVel;
+      updateKinematic(dt){
+        if(!this.nextAngularUpdate || performance.now() > this.nextAngularUpdate) {
+          let randomDir = vec3.fromValues(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5);
+          if(vec3.length(randomDir) < 1e-6){
+            vec3.set(randomDir, 0, 1, 0);
+          }
+          vec3.normalize(randomDir, randomDir);
+          vec3.scale(randomDir, randomDir, this.rotationSpeed);
+          this.angularVelocity = randomDir;
+          this.nextAngularUpdate = performance.now() + 1000 + Math.random() * 4000;
+        }
+        let wLen = vec3.length(this.angularVelocity);
+        if(wLen > 1e-8){
+          let axis = vec3.clone(this.angularVelocity);
+          vec3.normalize(axis, axis);
+          let angle = wLen * dt;
+          let dq = quat.create();
+          quat.setAxisAngle(dq, axis, angle);
+          quat.multiply(this.orientation, dq, this.orientation);
+          quat.normalize(this.orientation, this.orientation);
         }
       }
     }
-  }
-  // ============================================================
-  // MAIN APPLICATION CLASS
-  // ============================================================
-  class AdvancedApp {
-    constructor(){
-      this.canvas = document.getElementById("glCanvas");
-      this.gl = this.canvas.getContext("webgl", { antialias: true});
-      if(!this.gl){ alert("WebGL not supported"); return; }
-      this.resize();
-      window.addEventListener("resize", () => this.resize());
-      this.gl.enable(this.gl.DEPTH_TEST);
-      // Create the scene.
-      this.scene = new ExtendedScene();
-      Scene.current = this.scene;
-      this.physics = new PhysicsEngine(this.scene);
-      this.camera = new Camera();
-      this.ctrl = new CameraController(this.canvas, this.camera);
-      // Set simulation defaults.
-      this.gravity = 9.8;
-      this.sphereFriction = 0.8;
-      // Create container; override its rotationSpeed.
-      this.container = new Container(5);
-      this.container.rotationSpeed = 30.0;
-      this.scene.addBody(this.container);
-      // Create yellow ball.
-      this.yellow = new ExtendedBodySphere(0.5);
-      this.yellow.position[0] = 0;
-      this.yellow.position[1] = 4.5;
-      this.yellow.position[2] = 0;
-      this.yellow.restitution = 1.0;
-      this.scene.addBody(this.yellow);
-      // Create blue ball.
-      this.blue = new ExtendedBodySphere(0.4);
-      this.blue.position[0] = 1;
-      this.blue.position[1] = 4;
-      this.blue.position[2] = 1;
-      this.blue.restitution = 0.4;
-      this.scene.addBody(this.blue);
-      // Initialize shader programs.
-      this._initPrograms();
-      // Initialize shadow mapping (using 4096x4096 shadow map).
-      let shadowMap = initShadowMap(this.gl, 4096, 4096);
-      this.shadowFramebuffer = shadowMap.framebuffer;
-      this.shadowTexture = shadowMap.texture;
-      this.shadowMapWidth = 4096;
-      this.shadowMapHeight = 4096;
-      // Set up a fixed light.
-      this.lightPos = [0, 10, 10];
-      this.lightViewMatrix = mat4.create();
-      mat4.lookAt(this.lightViewMatrix, this.lightPos, [0,0,0], [0,1,0]);
-      this.lightProjMatrix = mat4.create();
-      mat4.ortho(this.lightProjMatrix, -15, 15, -15, 15, 1, 50);
-      // Precompute the fixed part: lightProj * lightView.
-      this.lightMVPFixed = mat4.create();
-      mat4.multiply(this.lightMVPFixed, this.lightProjMatrix, this.lightViewMatrix);
-      this._setupUI();
-      this.lastTime = 0;
-      requestAnimationFrame(t => this._loop(t));
-    }
-    resize(){
-      const gl = this.gl;
-      const ratio = window.devicePixelRatio || 1;
-      this.canvas.width = Math.floor(window.innerWidth * ratio);
-      this.canvas.height = Math.floor(window.innerHeight * ratio);
-      gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    }
-    _initPrograms(){
-      // Ball program (with shadows)
-      {
-        let vsSource = document.getElementById("ballVertexShader").textContent;
-        let fsSource = document.getElementById("ballFragmentShader").textContent;
-        let prog = createProgram(this.gl, vsSource, fsSource);
-        this.ballProg = {
-          program: prog,
-          attribs: {
-            aPosition: this.gl.getAttribLocation(prog, "aPosition"),
-            aNormal: this.gl.getAttribLocation(prog, "aNormal")
-          },
-          uniforms: {
-            uModelMatrix: this.gl.getUniformLocation(prog, "uModelMatrix"),
-            uViewMatrix: this.gl.getUniformLocation(prog, "uViewMatrix"),
-            uProjectionMatrix: this.gl.getUniformLocation(prog, "uProjectionMatrix"),
-            uNormalMatrix: this.gl.getUniformLocation(prog, "uNormalMatrix"),
-            uBaseColor: this.gl.getUniformLocation(prog, "uBaseColor"),
-            uLightPos: this.gl.getUniformLocation(prog, "uLightPos"),
-            uCameraPos: this.gl.getUniformLocation(prog, "uCameraPos"),
-            uShininess: this.gl.getUniformLocation(prog, "uShininess"),
-            uLightMVP: this.gl.getUniformLocation(prog, "uLightMVP"),
-            uShadowMap: this.gl.getUniformLocation(prog, "uShadowMap")
-          }
-        };
-      }
-      // Ball line program.
-      {
-        let vsSource = document.getElementById("ballLineVertexShader").textContent;
-        let fsSource = document.getElementById("ballLineFragmentShader").textContent;
-        let prog = createProgram(this.gl, vsSource, fsSource);
-        this.ballLineProg = {
-          program: prog,
-          attribs: {
-            aPosition: this.gl.getAttribLocation(prog, "aPosition")
-          },
-          uniforms: {
-            uModelMatrix: this.gl.getUniformLocation(prog, "uModelMatrix"),
-            uViewMatrix: this.gl.getUniformLocation(prog, "uViewMatrix"),
-            uProjectionMatrix: this.gl.getUniformLocation(prog, "uProjectionMatrix")
-          }
-        };
-      }
-      // Sphere program (with shadows)
-      {
-        let vsSource = document.getElementById("sphereVertexShader").textContent;
-        let fsSource = document.getElementById("sphereFragmentShader").textContent;
-        let prog = createProgram(this.gl, vsSource, fsSource);
-        this.sphereProg = {
-          program: prog,
-          attribs: {
-            aPosition: this.gl.getAttribLocation(prog, "aPosition")
-          },
-          uniforms: {
-            uModelMatrix: this.gl.getUniformLocation(prog, "uModelMatrix"),
-            uViewMatrix: this.gl.getUniformLocation(prog, "uViewMatrix"),
-            uProjectionMatrix: this.gl.getUniformLocation(prog, "uProjectionMatrix"),
-            uLightMVP: this.gl.getUniformLocation(prog, "uLightMVP"),
-            uShadowMap: this.gl.getUniformLocation(prog, "uShadowMap")
-          }
-        };
-      }
-      // Shadow map program.
-      {
-        let vsSource = document.getElementById("shadowMapVertexShader").textContent;
-        let fsSource = document.getElementById("shadowMapFragmentShader").textContent;
-        let prog = createProgram(this.gl, vsSource, fsSource);
-        this.shadowMapProg = {
-          program: prog,
-          attribs: {
-            aPosition: this.gl.getAttribLocation(prog, "aPosition")
-          },
-          uniforms: {
-            uLightMVP: this.gl.getUniformLocation(prog, "uLightMVP")
-          }
-        };
-      }
-    }
-    _setupUI(){
-      const gravitySlider = document.getElementById("gravitySlider");
-      const gravityValue = document.getElementById("gravityValue");
-      const sphereFrictionSlider = document.getElementById("sphereFrictionSlider");
-      const sphereFrictionValue = document.getElementById("sphereFrictionValue");
-      const yellowSizeSlider = document.getElementById("yellowSizeSlider");
-      const yellowSizeValue = document.getElementById("yellowSizeValue");
-      const blueSizeSlider = document.getElementById("blueSizeSlider");
-      const blueSizeValue = document.getElementById("blueSizeValue");
-      const yellowBounceSlider = document.getElementById("yellowBounceSlider");
-      const yellowBounceValue = document.getElementById("yellowBounceValue");
-      const blueBounceSlider = document.getElementById("blueBounceSlider");
-      const blueBounceValue = document.getElementById("blueBounceValue");
-      const rotationSlider = document.getElementById("rotationSlider");
-      const rotationValue = document.getElementById("rotationValue");
-      gravitySlider.addEventListener("input", (e) => {
-        let val = parseFloat(e.target.value);
-        gravityValue.innerText = val.toFixed(1);
-        this.gravity = val;
-      });
-      sphereFrictionSlider.addEventListener("input", (e) => {
-        let val = parseFloat(e.target.value);
-        sphereFrictionValue.innerText = val.toFixed(1);
-        this.sphereFriction = val;
-      });
-      yellowSizeSlider.addEventListener("input", (e) => {
-        let val = parseFloat(e.target.value);
-        yellowSizeValue.innerText = val.toFixed(1);
-        this.yellow.radius = val;
-        this.yellow.mass = val * val * val;
-        this.yellow.invMass = (this.yellow.mass > 1e-8 ? 1/this.yellow.mass : 0);
-        this.yellow.position[1] = this.container.radius - this.yellow.radius - 0.5;
-      });
-      blueSizeSlider.addEventListener("input", (e) => {
-        let val = parseFloat(e.target.value);
-        blueSizeValue.innerText = val.toFixed(1);
-        this.blue.radius = val;
-        this.blue.mass = val * val * val;
-        this.blue.invMass = (this.blue.mass > 1e-8 ? 1/this.blue.mass : 0);
-        this.blue.position[1] = this.container.radius - this.blue.radius - 0.5;
-      });
-      yellowBounceSlider.addEventListener("input", (e) => {
-        let val = parseFloat(e.target.value);
-        yellowBounceValue.innerText = val.toFixed(2);
-        this.yellow.restitution = val;
-      });
-      blueBounceSlider.addEventListener("input", (e) => {
-        let val = parseFloat(e.target.value);
-        blueBounceValue.innerText = val.toFixed(2);
-        this.blue.restitution = val;
-      });
-      rotationSlider.addEventListener("input", (e) => {
-        let val = parseFloat(e.target.value);
-        rotationValue.innerText = val.toFixed(1);
-        this.container.rotationSpeed = val;
-      });
-    }
-    _renderShadowPass(){
-      // Render the scene from the light's perspective into the shadow map.
-      const gl = this.gl;
-      gl.useProgram(this.shadowMapProg.program);
-      // Draw container.
-      this._drawShadowContainer(this.container);
-      // Draw spheres.
-      this._drawShadowSphere(this.yellow);
-      this._drawShadowSphere(this.blue);
-    }
-    _drawShadowContainer(container){
-      const gl = this.gl;
-      let model = mat4.create();
-      mat4.fromQuat(model, container.orientation);
-      let lightMVP_obj = mat4.create();
-      mat4.multiply(lightMVP_obj, this.lightMVPFixed, model);
-      gl.uniformMatrix4fv(this.shadowMapProg.uniforms.uLightMVP, false, lightMVP_obj);
-      if(!this._containerMeshShadow){
-        this._containerMeshShadow = new SphereMesh(gl, container.radius, 32, 32);
-      }
-      gl.bindBuffer(gl.ARRAY_BUFFER, this._containerMeshShadow.vertBuffer);
-      gl.enableVertexAttribArray(this.shadowMapProg.attribs.aPosition);
-      gl.vertexAttribPointer(this.shadowMapProg.attribs.aPosition, 3, gl.FLOAT, false, 0, 0);
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._containerMeshShadow.triIndexBuffer);
-      gl.drawElements(gl.TRIANGLES, this._containerMeshShadow.triCount, gl.UNSIGNED_SHORT, 0);
-      gl.disableVertexAttribArray(this.shadowMapProg.attribs.aPosition);
-    }
-    _drawShadowSphere(body){
-      const gl = this.gl;
-      let model = mat4.create();
-      mat4.fromRotationTranslationScale(model, body.orientation, body.position, [body.radius, body.radius, body.radius]);
-      let lightMVP_obj = mat4.create();
-      mat4.multiply(lightMVP_obj, this.lightMVPFixed, model);
-      gl.uniformMatrix4fv(this.shadowMapProg.uniforms.uLightMVP, false, lightMVP_obj);
-      if(!this._shadowSphereMeshCache) this._shadowSphereMeshCache = new Map();
-      let key = Math.round(body.radius * 100);
-      if(!this._shadowSphereMeshCache.has(key)){
-        let mesh = new SphereMesh(gl, 1, 32, 32);
-        this._shadowSphereMeshCache.set(key, mesh);
-      }
-      let mesh = this._shadowSphereMeshCache.get(key);
-      gl.bindBuffer(gl.ARRAY_BUFFER, mesh.vertBuffer);
-      gl.enableVertexAttribArray(this.shadowMapProg.attribs.aPosition);
-      gl.vertexAttribPointer(this.shadowMapProg.attribs.aPosition, 3, gl.FLOAT, false, 0, 0);
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.triIndexBuffer);
-      gl.drawElements(gl.TRIANGLES, mesh.triCount, gl.UNSIGNED_SHORT, 0);
-      gl.disableVertexAttribArray(this.shadowMapProg.attribs.aPosition);
-    }
-    _renderMainPass(){
-      const gl = this.gl;
-      gl.useProgram(this.ballProg.program);
-      // Bind shadow texture to texture unit 1.
-      gl.activeTexture(gl.TEXTURE1);
-      gl.bindTexture(gl.TEXTURE_2D, this.shadowTexture);
-      gl.uniform1i(this.ballProg.uniforms.uShadowMap, 1);
-      gl.uniform3fv(this.ballProg.uniforms.uLightPos, this.lightPos);
-      // Draw container.
-      this._drawContainer(this.container);
-      // Draw yellow and blue balls.
-      this._drawSphere(this.yellow, [1, 1, 0, 1]);
-      this._drawSphere(this.blue, [0, 0.7, 1, 1]);
-    }
-    _drawContainer(container){
-      const gl = this.gl;
-      gl.useProgram(this.sphereProg.program);
-      let model = mat4.create();
-      mat4.fromQuat(model, container.orientation);
-      gl.uniformMatrix4fv(this.sphereProg.uniforms.uModelMatrix, false, model);
-      gl.uniformMatrix4fv(this.sphereProg.uniforms.uViewMatrix, false, this.camera.viewMatrix);
-      gl.uniformMatrix4fv(this.sphereProg.uniforms.uProjectionMatrix, false, this.camera.projMatrix);
-      let lightMVP_obj = mat4.create();
-      mat4.multiply(lightMVP_obj, this.lightMVPFixed, model);
-      gl.uniformMatrix4fv(this.sphereProg.uniforms.uLightMVP, false, lightMVP_obj);
-      if(!this.containerBuffers){
-        let seg = 32, verts = [], inds = [];
-        for(let lat = 0; lat <= seg; lat++){
-          let theta = lat * Math.PI / seg;
-          let sinT = Math.sin(theta), cosT = Math.cos(theta);
-          for(let lon = 0; lon <= seg; lon++){
-            let phi = lon * 2 * Math.PI / seg;
-            let sinP = Math.sin(phi), cosP = Math.cos(phi);
-            let x = container.radius * cosP * sinT;
-            let y = container.radius * cosT;
-            let z = container.radius * sinP * sinT;
-            verts.push(x, y, z);
-          }
-        }
-        for(let lat = 0; lat <= seg; lat++){
-          let row = lat * (seg + 1);
-          for(let lon = 0; lon < seg; lon++){
-            inds.push(row + lon, row + lon + 1);
-          }
-        }
-        for(let lon = 0; lon <= seg; lon++){
-          for(let lat = 0; lat < seg; lat++){
-            let i1 = lat * (seg + 1) + lon;
-            let i2 = (lat + 1) * (seg + 1) + lon;
-            inds.push(i1, i2);
-          }
-        }
-        this.containerBuffers = {
-          vbuf: gl.createBuffer(),
-          ibuf: gl.createBuffer(),
-          count: inds.length
-        };
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.containerBuffers.vbuf);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.containerBuffers.ibuf);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(inds), gl.STATIC_DRAW);
-      }
-      gl.bindBuffer(gl.ARRAY_BUFFER, this.containerBuffers.vbuf);
-      gl.enableVertexAttribArray(this.sphereProg.attribs.aPosition);
-      gl.vertexAttribPointer(this.sphereProg.attribs.aPosition, 3, gl.FLOAT, false, 0, 0);
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.containerBuffers.ibuf);
-      gl.drawElements(gl.LINES, this.containerBuffers.count, gl.UNSIGNED_SHORT, 0);
-      gl.disableVertexAttribArray(this.sphereProg.attribs.aPosition);
-      gl.bindBuffer(gl.ARRAY_BUFFER, null);
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
-    }
-    _drawSphere(body, color){
-      const gl = this.gl;
-      gl.useProgram(this.ballProg.program);
-      let model = mat4.create();
-      mat4.fromRotationTranslationScale(model, body.orientation, body.position, [body.radius, body.radius, body.radius]);
-      gl.uniformMatrix4fv(this.ballProg.uniforms.uModelMatrix, false, model);
-      gl.uniformMatrix4fv(this.ballProg.uniforms.uViewMatrix, false, this.camera.viewMatrix);
-      gl.uniformMatrix4fv(this.ballProg.uniforms.uProjectionMatrix, false, this.camera.projMatrix);
-      let nmat = mat3.create();
-      mat3.fromMat4(nmat, model);
-      mat3.invert(nmat, nmat);
-      mat3.transpose(nmat, nmat);
-      gl.uniformMatrix3fv(this.ballProg.uniforms.uNormalMatrix, false, nmat);
-      gl.uniform4fv(this.ballProg.uniforms.uBaseColor, color);
-      gl.uniform3fv(this.ballProg.uniforms.uLightPos, this.lightPos);
-      let invView = mat4.create();
-      mat4.invert(invView, this.camera.viewMatrix);
-      let camPos = [invView[12], invView[13], invView[14]];
-      gl.uniform3fv(this.ballProg.uniforms.uCameraPos, camPos);
-      gl.uniform1f(this.ballProg.uniforms.uShininess, 16.0);
-      let lightMVP_obj = mat4.create();
-      mat4.multiply(lightMVP_obj, this.lightMVPFixed, model);
-      gl.uniformMatrix4fv(this.ballProg.uniforms.uLightMVP, false, lightMVP_obj);
-      if(!this._sphereMeshCache) this._sphereMeshCache = new Map();
-      let key = Math.round(body.radius * 100);
-      if(!this._sphereMeshCache.has(key)){
-        let mesh = new SphereMesh(gl, 1, 32, 32);
-        this._sphereMeshCache.set(key, mesh);
-      }
-      let mesh = this._sphereMeshCache.get(key);
-      gl.bindBuffer(gl.ARRAY_BUFFER, mesh.vertBuffer);
-      gl.enableVertexAttribArray(this.ballProg.attribs.aPosition);
-      gl.vertexAttribPointer(this.ballProg.attribs.aPosition, 3, gl.FLOAT, false, 0, 0);
-      gl.bindBuffer(gl.ARRAY_BUFFER, mesh.normBuffer);
-      gl.enableVertexAttribArray(this.ballProg.attribs.aNormal);
-      gl.vertexAttribPointer(this.ballProg.attribs.aNormal, 3, gl.FLOAT, false, 0, 0);
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.triIndexBuffer);
-      gl.drawElements(gl.TRIANGLES, mesh.triCount, gl.UNSIGNED_SHORT, 0);
-      gl.disableVertexAttribArray(this.ballProg.attribs.aPosition);
-      gl.disableVertexAttribArray(this.ballProg.attribs.aNormal);
-      gl.useProgram(this.ballLineProg.program);
-      gl.uniformMatrix4fv(this.ballLineProg.uniforms.uModelMatrix, false, model);
-      gl.uniformMatrix4fv(this.ballLineProg.uniforms.uViewMatrix, false, this.camera.viewMatrix);
-      gl.uniformMatrix4fv(this.ballLineProg.uniforms.uProjectionMatrix, false, this.camera.projMatrix);
-      gl.bindBuffer(gl.ARRAY_BUFFER, mesh.vertBuffer);
-      gl.enableVertexAttribArray(this.ballLineProg.attribs.aPosition);
-      gl.vertexAttribPointer(this.ballLineProg.attribs.aPosition, 3, gl.FLOAT, false, 0, 0);
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.lineIndexBuffer);
-      gl.drawElements(gl.LINES, mesh.lineCount, gl.UNSIGNED_SHORT, 0);
-      gl.disableVertexAttribArray(this.ballLineProg.attribs.aPosition);
-    }
-    _loop(t){
-      let dt = (t - this.lastTime) * 0.001;
-      this.lastTime = t;
-      if(dt > 0.1) dt = 0.1;
-      // Apply constant -y gravity.
-      for(let b of this.scene.bodies){
-        if(b.isKinematic || b.isSleeping) continue;
-        b.velocity[1] -= this.gravity * dt;
-      }
-      this.yellow.friction = this.sphereFriction;
-      this.blue.friction = this.sphereFriction;
-      this.physics.step(dt);
-      this._render();
-      document.getElementById("debugPanel").innerText = this.scene.debugInfo;
-      requestAnimationFrame(tt => this._loop(tt));
-    }
-    _render(){
-      const gl = this.gl;
-      // --- Shadow Pass ---
-      gl.bindFramebuffer(gl.FRAMEBUFFER, this.shadowFramebuffer);
-      gl.viewport(0, 0, this.shadowMapWidth, this.shadowMapHeight);
-      gl.clearColor(1,1,1,1);
-      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-      this._renderShadowPass();
-      // --- Main Pass ---
+    // ============================================================
+    // SHADOW MAPPING SETUP
+    // ============================================================
+    function initShadowMap(gl, width, height) {
+      let shadowFramebuffer = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, shadowFramebuffer);
+      let shadowTexture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, shadowTexture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, shadowTexture, 0);
+      let renderbuffer = gl.createRenderbuffer();
+      gl.bindRenderbuffer(gl.RENDERBUFFER, renderbuffer);
+      gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+      gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, renderbuffer);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-      gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-      gl.clearColor(0.1, 0.1, 0.1, 1);
-      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-      this.camera.update(gl);
-      this._renderMainPass();
+      return { framebuffer: shadowFramebuffer, texture: shadowTexture };
     }
-  }
-  document.addEventListener("DOMContentLoaded", () => {
-    new AdvancedApp();
-  });
+    // ============================================================
+    // Resting Damping Function (preserving constant -y gravity)
+    // ============================================================
+    function applyRestingDamping(scene) {
+      const container = scene.bodies.find(b => b.isContainer);
+      if (!container) return;
+      for(let b of scene.bodies) {
+        if(b.isContainer || b.isSleeping) continue;
+        let r = vec3.length(b.position);
+        let desiredRest = container.radius - b.radius;
+        if(Math.abs(r - desiredRest) < 0.1) {
+          let radial = vec3.create();
+          vec3.normalize(radial, b.position);
+          let vRad = vec3.dot(b.velocity, radial);
+          let vTang = vec3.create();
+          vec3.scale(vTang, radial, vRad);
+          vec3.sub(vTang, b.velocity, vTang);
+          if(vec3.length(vTang) < 0.000001) {
+            let newVel = vec3.scale(vec3.create(), radial, vRad);
+            newVel[1] = b.velocity[1];
+            b.velocity = newVel;
+          }
+        }
+      }
+    }
+    // ============================================================
+    // MAIN APPLICATION CLASS
+    // ============================================================
+    class AdvancedApp {
+      constructor(){
+        this.canvas = document.getElementById("glCanvas");
+        this.gl = this.canvas.getContext("webgl", { antialias: true});
+        if(!this.gl){ alert("WebGL not supported"); return; }
+        this.resize();
+        window.addEventListener("resize", () => this.resize());
+        this.gl.enable(this.gl.DEPTH_TEST);
+        this.scene = new ExtendedScene();
+        Scene.current = this.scene;
+        this.physics = new PhysicsEngine(this.scene);
+        this.camera = new Camera();
+        this.ctrl = new CameraController(this.canvas, this.camera);
+        this.gravity = 30.0;
+        this.sphereFriction = 8;
+        this.container = new Container(5);
+        this.container.rotationSpeed = 30.0;
+        this.scene.addBody(this.container);
+        this.yellow = new ExtendedBodySphere(0.3);
+        this.yellow.position[0] = 0;
+        this.yellow.position[1] = this.container.radius - this.yellow.radius - 0.5;
+        this.yellow.position[2] = 0;
+        this.yellow.restitution = 0.0;
+        this.scene.addBody(this.yellow);
+        this.blue = new ExtendedBodySphere(0.3);
+        this.blue.position[0] = 1;
+        this.blue.position[1] = this.container.radius - this.blue.radius - 0.5;
+        this.blue.position[2] = 1;
+        this.blue.restitution = 0.0;
+        this.scene.addBody(this.blue);
+        this._initPrograms();
+        let shadowMap = initShadowMap(this.gl, 4096, 4096);
+        this.shadowFramebuffer = shadowMap.framebuffer;
+        this.shadowTexture = shadowMap.texture;
+        this.shadowMapWidth = 4096;
+        this.shadowMapHeight = 4096;
+        this.lightPos = [0, 10, 10];
+        this.lightViewMatrix = mat4.create();
+        mat4.lookAt(this.lightViewMatrix, this.lightPos, [0,0,0], [0,1,0]);
+        this.lightProjMatrix = mat4.create();
+        mat4.ortho(this.lightProjMatrix, -15, 15, -15, 15, 1, 50);
+        this.lightMVPFixed = mat4.create();
+        mat4.multiply(this.lightMVPFixed, this.lightProjMatrix, this.lightViewMatrix);
+        this._setupUI();
+        this.lastTime = 0;
+        requestAnimationFrame(t => this._loop(t));
+      }
+      resize(){
+        const gl = this.gl;
+        const ratio = window.devicePixelRatio || 1;
+        this.canvas.width = Math.floor(window.innerWidth * ratio);
+        this.canvas.height = Math.floor(window.innerHeight * ratio);
+        gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+      }
+      _initPrograms(){
+        {
+          let vsSource = document.getElementById("ballVertexShader").textContent;
+          let fsSource = document.getElementById("ballFragmentShader").textContent;
+          let prog = createProgram(this.gl, vsSource, fsSource);
+          this.ballProg = {
+            program: prog,
+            attribs: {
+              aPosition: this.gl.getAttribLocation(prog, "aPosition"),
+              aNormal: this.gl.getAttribLocation(prog, "aNormal")
+            },
+            uniforms: {
+              uModelMatrix: this.gl.getUniformLocation(prog, "uModelMatrix"),
+              uViewMatrix: this.gl.getUniformLocation(prog, "uViewMatrix"),
+              uProjectionMatrix: this.gl.getUniformLocation(prog, "uProjectionMatrix"),
+              uNormalMatrix: this.gl.getUniformLocation(prog, "uNormalMatrix"),
+              uBaseColor: this.gl.getUniformLocation(prog, "uBaseColor"),
+              uLightPos: this.gl.getUniformLocation(prog, "uLightPos"),
+              uCameraPos: this.gl.getUniformLocation(prog, "uCameraPos"),
+              uShininess: this.gl.getUniformLocation(prog, "uShininess"),
+              uLightMVP: this.gl.getUniformLocation(prog, "uLightMVP"),
+              uShadowMap: this.gl.getUniformLocation(prog, "uShadowMap")
+            }
+          };
+        }
+        {
+          let vsSource = document.getElementById("ballLineVertexShader").textContent;
+          let fsSource = document.getElementById("ballLineFragmentShader").textContent;
+          let prog = createProgram(this.gl, vsSource, fsSource);
+          this.ballLineProg = {
+            program: prog,
+            attribs: {
+              aPosition: this.gl.getAttribLocation(prog, "aPosition")
+            },
+            uniforms: {
+              uModelMatrix: this.gl.getUniformLocation(prog, "uModelMatrix"),
+              uViewMatrix: this.gl.getUniformLocation(prog, "uViewMatrix"),
+              uProjectionMatrix: this.gl.getUniformLocation(prog, "uProjectionMatrix")
+            }
+          };
+        }
+        {
+          let vsSource = document.getElementById("sphereVertexShader").textContent;
+          let fsSource = document.getElementById("sphereFragmentShader").textContent;
+          let prog = createProgram(this.gl, vsSource, fsSource);
+          this.sphereProg = {
+            program: prog,
+            attribs: {
+              aPosition: this.gl.getAttribLocation(prog, "aPosition")
+            },
+            uniforms: {
+              uModelMatrix: this.gl.getUniformLocation(prog, "uModelMatrix"),
+              uViewMatrix: this.gl.getUniformLocation(prog, "uViewMatrix"),
+              uProjectionMatrix: this.gl.getUniformLocation(prog, "uProjectionMatrix"),
+              uLightMVP: this.gl.getUniformLocation(prog, "uLightMVP"),
+              uShadowMap: this.gl.getUniformLocation(prog, "uShadowMap")
+            }
+          };
+        }
+        {
+          let vsSource = document.getElementById("shadowMapVertexShader").textContent;
+          let fsSource = document.getElementById("shadowMapFragmentShader").textContent;
+          let prog = createProgram(this.gl, vsSource, fsSource);
+          this.shadowMapProg = {
+            program: prog,
+            attribs: {
+              aPosition: this.gl.getAttribLocation(prog, "aPosition")
+            },
+            uniforms: {
+              uLightMVP: this.gl.getUniformLocation(prog, "uLightMVP")
+            }
+          };
+        }
+      }
+      _setupUI(){
+        const gravitySlider = document.getElementById("gravitySlider");
+        const gravityValue = document.getElementById("gravityValue");
+        const sphereFrictionSlider = document.getElementById("sphereFrictionSlider");
+        const sphereFrictionValue = document.getElementById("sphereFrictionValue");
+        const rotationSlider = document.getElementById("rotationSlider");
+        const rotationValue = document.getElementById("rotationValue");
+        gravitySlider.addEventListener("input", (e) => {
+          let val = parseFloat(e.target.value);
+          gravityValue.innerText = val.toFixed(1);
+          this.gravity = val;
+        });
+        sphereFrictionSlider.addEventListener("input", (e) => {
+          let val = parseFloat(e.target.value);
+          sphereFrictionValue.innerText = val.toFixed(1);
+          this.sphereFriction = val;
+        });
+        rotationSlider.addEventListener("input", (e) => {
+          let val = parseFloat(e.target.value);
+          rotationValue.innerText = val.toFixed(1);
+          this.container.rotationSpeed = val;
+        });
+      }
+      _renderShadowPass(){
+        const gl = this.gl;
+        gl.useProgram(this.shadowMapProg.program);
+        this._drawShadowContainer(this.container);
+        this._drawShadowSphere(this.yellow);
+        this._drawShadowSphere(this.blue);
+      }
+      _drawShadowContainer(container){
+        const gl = this.gl;
+        let model = mat4.create();
+        mat4.fromQuat(model, container.orientation);
+        let lightMVP_obj = mat4.create();
+        mat4.multiply(lightMVP_obj, this.lightMVPFixed, model);
+        gl.uniformMatrix4fv(this.shadowMapProg.uniforms.uLightMVP, false, lightMVP_obj);
+        if(!this._containerMeshShadow){
+          this._containerMeshShadow = new SphereMesh(gl, container.radius, 32, 32);
+        }
+        gl.bindBuffer(gl.ARRAY_BUFFER, this._containerMeshShadow.vertBuffer);
+        gl.enableVertexAttribArray(this.shadowMapProg.attribs.aPosition);
+        gl.vertexAttribPointer(this.shadowMapProg.attribs.aPosition, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this._containerMeshShadow.triIndexBuffer);
+        gl.drawElements(gl.TRIANGLES, this._containerMeshShadow.triCount, gl.UNSIGNED_SHORT, 0);
+        gl.disableVertexAttribArray(this.shadowMapProg.attribs.aPosition);
+      }
+      _drawShadowSphere(body){
+        const gl = this.gl;
+        let model = mat4.create();
+        mat4.fromRotationTranslationScale(model, body.orientation, body.position, [body.radius, body.radius, body.radius]);
+        let lightMVP_obj = mat4.create();
+        mat4.multiply(lightMVP_obj, this.lightMVPFixed, model);
+        gl.uniformMatrix4fv(this.shadowMapProg.uniforms.uLightMVP, false, lightMVP_obj);
+        if(!this._shadowSphereMeshCache) this._shadowSphereMeshCache = new Map();
+        let key = Math.round(body.radius * 100);
+        if(!this._shadowSphereMeshCache.has(key)){
+          let mesh = new SphereMesh(gl, 1, 32, 32);
+          this._shadowSphereMeshCache.set(key, mesh);
+        }
+        let mesh = this._shadowSphereMeshCache.get(key);
+        gl.bindBuffer(gl.ARRAY_BUFFER, mesh.vertBuffer);
+        gl.enableVertexAttribArray(this.shadowMapProg.attribs.aPosition);
+        gl.vertexAttribPointer(this.shadowMapProg.attribs.aPosition, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.triIndexBuffer);
+        gl.drawElements(gl.TRIANGLES, mesh.triCount, gl.UNSIGNED_SHORT, 0);
+        gl.disableVertexAttribArray(this.shadowMapProg.attribs.aPosition);
+      }
+      _renderMainPass(){
+        const gl = this.gl;
+        gl.useProgram(this.ballProg.program);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, this.shadowTexture);
+        gl.uniform1i(this.ballProg.uniforms.uShadowMap, 1);
+        gl.uniform3fv(this.ballProg.uniforms.uLightPos, this.lightPos);
+        this._drawContainer(this.container);
+        this._drawSphere(this.yellow, [1, 1, 0, 1]);
+        this._drawSphere(this.blue, [0, 0.7, 1, 1]);
+      }
+      _drawContainer(container){
+        const gl = this.gl;
+        gl.useProgram(this.sphereProg.program);
+        let model = mat4.create();
+        mat4.fromQuat(model, container.orientation);
+        gl.uniformMatrix4fv(this.sphereProg.uniforms.uModelMatrix, false, model);
+        gl.uniformMatrix4fv(this.sphereProg.uniforms.uViewMatrix, false, this.camera.viewMatrix);
+        gl.uniformMatrix4fv(this.sphereProg.uniforms.uProjectionMatrix, false, this.camera.projMatrix);
+        let lightMVP_obj = mat4.create();
+        mat4.multiply(lightMVP_obj, this.lightMVPFixed, model);
+        gl.uniformMatrix4fv(this.sphereProg.uniforms.uLightMVP, false, lightMVP_obj);
+        if(!this.containerBuffers){
+          let seg = 32, verts = [], inds = [];
+          for(let lat = 0; lat <= seg; lat++){
+            let theta = lat * Math.PI / seg;
+            let sinT = Math.sin(theta), cosT = Math.cos(theta);
+            for(let lon = 0; lon <= seg; lon++){
+              let phi = lon * 2 * Math.PI / seg;
+              let sinP = Math.sin(phi), cosP = Math.cos(phi);
+              let x = container.radius * cosP * sinT;
+              let y = container.radius * cosT;
+              let z = container.radius * sinP * sinT;
+              verts.push(x, y, z);
+            }
+          }
+          for(let lat = 0; lat <= seg; lat++){
+            let row = lat * (seg + 1);
+            for(let lon = 0; lon < seg; lon++){
+              inds.push(row + lon, row + lon + 1);
+            }
+          }
+          for(let lon = 0; lon <= seg; lon++){
+            for(let lat = 0; lat < seg; lat++){
+              let i1 = lat * (seg + 1) + lon;
+              let i2 = (lat + 1) * (seg + 1) + lon;
+              inds.push(i1, i2);
+            }
+          }
+          this.containerBuffers = {
+            vbuf: gl.createBuffer(),
+            ibuf: gl.createBuffer(),
+            count: inds.length
+          };
+          gl.bindBuffer(gl.ARRAY_BUFFER, this.containerBuffers.vbuf);
+          gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.containerBuffers.ibuf);
+          gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(inds), gl.STATIC_DRAW);
+        }
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.containerBuffers.vbuf);
+        gl.enableVertexAttribArray(this.sphereProg.attribs.aPosition);
+        gl.vertexAttribPointer(this.sphereProg.attribs.aPosition, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.containerBuffers.ibuf);
+        gl.drawElements(gl.LINES, this.containerBuffers.count, gl.UNSIGNED_SHORT, 0);
+        gl.disableVertexAttribArray(this.sphereProg.attribs.aPosition);
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+      }
+      _drawSphere(body, color){
+        const gl = this.gl;
+        gl.useProgram(this.ballProg.program);
+        let model = mat4.create();
+        mat4.fromRotationTranslationScale(model, body.orientation, body.position, [body.radius, body.radius, body.radius]);
+        gl.uniformMatrix4fv(this.ballProg.uniforms.uModelMatrix, false, model);
+        gl.uniformMatrix4fv(this.ballProg.uniforms.uViewMatrix, false, this.camera.viewMatrix);
+        gl.uniformMatrix4fv(this.ballProg.uniforms.uProjectionMatrix, false, this.camera.projMatrix);
+        let nmat = mat3.create();
+        mat3.fromMat4(nmat, model);
+        mat3.invert(nmat, nmat);
+        mat3.transpose(nmat, nmat);
+        gl.uniformMatrix3fv(this.ballProg.uniforms.uNormalMatrix, false, nmat);
+        gl.uniform4fv(this.ballProg.uniforms.uBaseColor, color);
+        gl.uniform3fv(this.ballProg.uniforms.uLightPos, this.lightPos);
+        let invView = mat4.create();
+        mat4.invert(invView, this.camera.viewMatrix);
+        let camPos = [invView[12], invView[13], invView[14]];
+        gl.uniform3fv(this.ballProg.uniforms.uCameraPos, camPos);
+        gl.uniform1f(this.ballProg.uniforms.uShininess, 16.0);
+        let lightMVP_obj = mat4.create();
+        mat4.multiply(lightMVP_obj, this.lightMVPFixed, model);
+        gl.uniformMatrix4fv(this.ballProg.uniforms.uLightMVP, false, lightMVP_obj);
+        if(!this._sphereMeshCache) this._sphereMeshCache = new Map();
+        let key = Math.round(body.radius * 100);
+        if(!this._sphereMeshCache.has(key)){
+          let mesh = new SphereMesh(gl, 1, 32, 32);
+          this._sphereMeshCache.set(key, mesh);
+        }
+        let mesh = this._sphereMeshCache.get(key);
+        gl.bindBuffer(gl.ARRAY_BUFFER, mesh.vertBuffer);
+        gl.enableVertexAttribArray(this.ballProg.attribs.aPosition);
+        gl.vertexAttribPointer(this.ballProg.attribs.aPosition, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ARRAY_BUFFER, mesh.normBuffer);
+        gl.enableVertexAttribArray(this.ballProg.attribs.aNormal);
+        gl.vertexAttribPointer(this.ballProg.attribs.aNormal, 3, gl.FLOAT, false, 0, 0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.triIndexBuffer);
+        gl.drawElements(gl.TRIANGLES, mesh.triCount, gl.UNSIGNED_SHORT, 0);
+        gl.disableVertexAttribArray(this.ballProg.attribs.aPosition);
+        gl.disableVertexAttribArray(this.ballProg.attribs.aNormal);
+
+      }
+      _loop(t){
+        let dt = (t - this.lastTime) * 0.001;
+        this.lastTime = t;
+        if(dt > 0.1) dt = 0.1;
+        for(let b of this.scene.bodies){
+          if(b.isKinematic || b.isSleeping) continue;
+          b.velocity[1] -= this.gravity * dt;
+        }
+        this.yellow.friction = this.sphereFriction;
+        this.blue.friction = this.sphereFriction;
+        this.physics.step(dt);
+        this._render();
+        document.getElementById("debugPanel").innerText = this.scene.debugInfo;
+        requestAnimationFrame(tt => this._loop(tt));
+      }
+      _render(){
+        const gl = this.gl;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.shadowFramebuffer);
+        gl.viewport(0, 0, this.shadowMapWidth, this.shadowMapHeight);
+        gl.clearColor(1,1,1,1);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        this._renderShadowPass();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+        gl.clearColor(0.1, 0.1, 0.1, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        this.camera.update(gl);
+        this._renderMainPass();
+      }
+    }
+    document.addEventListener("DOMContentLoaded", () => {
+      new AdvancedApp();
+    });
   </script>
 </body>
 </html>
