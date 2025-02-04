@@ -1,4 +1,4 @@
-# Visualizations & Games (for Desktop NOT mobile)
-Javascript visualizations and games I've made. Browser full screen mode recommended. My favorite visualization is the Solar System. The games are simple. All of these are created in collaboration with artificial intelligence coding tools. I'll add to this over time.
+# Visualizations / Games / Tools
+Javascript visualizations, games and experiments I've made. Browser full screen mode recommended. All are created in collaboration with artificial intelligence coding tools. I'll continue add to this over time. As models race towards AGI I'm seeing the scope of creativity and individual expression through code burgeoning.
 
 https://pgleamy.github.io/BrowserVisualizations/
