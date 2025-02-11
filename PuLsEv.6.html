@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>PuLsE v.6</title>
+  <title>PuLsE v.9</title>
   <!-- Three.js r154 Import Map -->
   <script type="importmap">
   {
@@ -28,26 +28,68 @@
       background: rgba(50, 50, 50, 0); color: #fff; overflow-y: auto;
       transition: opacity 0.3s ease, transform 0.3s ease;
       transform: translateX(-150px); opacity: 0; z-index: 10;
-      padding: 10px; box-sizing: border-box;
+      padding: 5px; box-sizing: border-box;
     }
     #controlPanel:hover { transform: translateX(0); opacity: 1; }
     .moduleHeader {
-      background: #333; padding: 5px; margin: 5px 0;
-      cursor: pointer; font-size: 14px;
+      background: #333; padding: 6px 3px; margin: 3px 0;
+      cursor: pointer; font-size: 11px;
       display: flex; justify-content: space-between; align-items: center;
     }
     .moduleContent {
-      display: none; padding: 5px; background: #444; margin-bottom: 10px; font-size: 13px;
+      display: none; padding: 3px; background: #444; margin-bottom: 3px; font-size: 10px;
     }
-    .controlElement { margin: 5px 0; }
-    .controlElement label { display: block; margin-bottom: 2px; }
+    .controlElement { margin: 4px 0; }
+    .controlElement label { display: flex; margin-bottom: 2px; }
     /* Favorite Settings styles */
-    #favoriteSettingsSection { border-top: 1px solid #666; padding-top: 10px; margin-top: 10px; }
+    #favoriteSettingsSection { border-top: 1px solid #666; padding-top: 4px; margin-top: 5px; }
+    /* New Favorites dropdown styling */
+    #toggleFavoriteList {
+      width: 100%;
+      background: #555;
+      color: #fff;
+      padding: 4px 8px;
+      margin: 4px 0;
+      font-size: 11px;
+      border: none;
+      cursor: pointer;
+    }
+    #favoriteListContainer {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 0.3s ease;
+    }
+    #favoriteListContainer.open {
+      max-height: 500px; /* Adjust height as needed */
+    }
     #favoriteList { list-style: none; padding: 0; margin: 0; }
     #favoriteList li {
-      margin: 5px 0; display: flex; justify-content: space-between; align-items: center;
+      margin: 3px 0; display: flex; justify-content: space-between; align-items: center;
     }
-    #favoriteList button { margin-left: 5px; font-size: 11px; padding: 2px 4px; }
+    #favoriteList button { margin-left: 3px; font-size: 10px; padding: 2px 3px; }
+    
+    /* New Slideshow Controls styling */
+    #slideshowControls {
+      margin: 8px 0;
+      padding: 4px;
+      background: #444;
+      border: 1px solid #666;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      font-size: 11px;
+    }
+    #slideshowControls button {
+      margin-bottom: 4px;
+    }
+    #slideshowOptions {
+      display: flex;
+      justify-content: space-between;
+    }
+    #slideshowOptions label {
+      display: flex;
+      align-items: center;
+    }
   </style>
 </head>
 <body>
@@ -56,7 +98,7 @@
     <!-- Global Settings Panel -->
     <div class="moduleHeader" data-target="globalSettings" style="position: relative;">
       <span>PuLsE Globals</span>
-      <div id="donate-button-container" style="position: absolute; top: 3px; right: 5px; z-index: 100;">
+      <div id="donate-button-container" style="position: absolute; font-size: 10px; top: 2px; right: 2px; z-index: 100;">
         <div id="donate-button"></div>
         <!-- PayPal Donate SDK (kept as-is) -->
         <script src="https://www.paypalobjects.com/donate/sdk/donate-sdk.js" charset="UTF-8"></script>
@@ -80,6 +122,15 @@
           <input type="checkbox" id="fullscreenToggle"> Fullscreen
         </label>
       </div>
+
+      <!-- NEW: Single "Screen stays active" checkbox for wake lock functionality -->
+      <div class="controlElement">
+        <label>
+          <input type="checkbox" id="screenStaysActive" />
+          Screen stays active
+        </label>
+      </div>
+
       <div class="controlElement">
         <label>Number of Points:
           <input type="range" id="globalPointCount" min="10000" max="60000" step="100" value="30000">
@@ -113,7 +164,6 @@
         <span>Glow Points Settings</span>
       </div>
       <div id="glowPointsSettings" class="moduleContent" style="display: none;">
-
         <div class="controlElement">
           <label>Stop 1 Position
             <input type="range" id="glowStop0Pos" min="0" max="1" step="0.01" value="0">
@@ -124,7 +174,6 @@
             <input type="range" id="glowStop0Alpha" min="0" max="1" step="0.01" value="1">
           </label>
         </div>
-
         <div class="controlElement">
           <label>Stop 2 Position
             <input type="range" id="glowStop1Pos" min="0" max="1" step="0.01" value="0.15">
@@ -135,7 +184,6 @@
             <input type="range" id="glowStop1Alpha" min="0" max="1" step="0.01" value="1">
           </label>
         </div>
-
         <div class="controlElement">
           <label>Stop 3 Position
             <input type="range" id="glowStop2Pos" min="0" max="1" step="0.01" value="0.25">
@@ -146,7 +194,6 @@
             <input type="range" id="glowStop2Alpha" min="0" max="1" step="0.01" value="0.4">
           </label>
         </div>
-
         <div class="controlElement">
           <label>Stop 4 Position
             <input type="range" id="glowStop3Pos" min="0" max="1" step="0.01" value="1">
@@ -157,15 +204,34 @@
             <input type="range" id="glowStop3Alpha" min="0" max="1" step="0.01" value="0">
           </label>
         </div>
-
       </div>
       <!-- End Glow Points Settings -->
+
+      <!-- New Slideshow Controls Section -->
+      <div id="slideshowControls">
+        <button id="startSlideshow">SLIDESHOW</button>
+        <div id="slideshowOptions">
+          <label for="slideshowRandom">
+            <input type="checkbox" id="slideshowRandom"> Random
+          </label>
+          <label for="slideshowInterval">
+            Interval: <input type="number" id="slideshowInterval" min="1" max="30" value="5" style="width:40px;"> min
+          </label>
+        </div>
+<div id="slideshowInstructions" style="font-size:10px; text-align:center; margin-top:4px;">
+  Drag mouse to right side to disable
+</div>
+      </div>
 
       <!-- Favorite Settings Section -->
       <div id="favoriteSettingsSection">
         <button id="saveFavorite">Save Favorite</button>
-        <ul id="favoriteList"></ul>
+        <button id="toggleFavoriteList">Your Favorites</button>
+        <div id="favoriteListContainer">
+          <ul id="favoriteList"></ul>
+        </div>
       </div>
+
     </div>
 
     <!-- Equation Modules Container -->
@@ -221,11 +287,11 @@
           <input type="range" id="soundJitterModStrength" min="0" max="2" step="0.0001" value=".5">
         </label>
       </div>
-      <div class="controlElement" id="soundStatus" style="font-size:12px; text-align:center;">
+      <div class="controlElement" id="soundStatus" style="font-size:11px; text-align:center;">
         Click "Start Audio" to begin.
       </div>
       <div class="controlElement" style="text-align:center;">
-        <button id="startAudio" style="padding:4px 8px; font-size:12px;">Start Audio</button>
+        <button id="startAudio" style="padding:4px 8px; font-size:11px;">Start Audio</button>
       </div>
     </div>
   </div>
@@ -508,8 +574,8 @@
       constructor() {
         super();
         this.scaleFactor = 100;
-        this.octaves = 4;       // Number of noise layers
-        this.persistence = 0.5; // Amplitude falloff per octave
+        this.octaves = 4;
+        this.persistence = 0.5;
         this.simplex = new SimplexNoise();
         this.t = 0;
       }
@@ -520,16 +586,13 @@
         let amplitude = 1.0;
         let frequency = 1.0;
         let maxAmplitude = 0;
-        // Sum multiple octaves
         for (let i = 0; i < this.octaves; i++) {
           noiseValue += amplitude * this.simplex.noise(tVal * frequency, tVal * frequency, tVal * frequency);
           maxAmplitude += amplitude;
           amplitude *= this.persistence;
           frequency *= 2.0;
         }
-        // Normalize
         noiseValue /= maxAmplitude;
-
         return new THREE.Vector3(
           this.scaleFactor * noiseValue * Math.cos(tVal),
           this.scaleFactor * noiseValue * Math.sin(tVal),
@@ -549,11 +612,8 @@
       getContribution(index, totalPoints, time) {
         this.t = time * this.speed;
         const tVal = this.t + index * 0.01;
-        // Base noise
         let n = this.simplex.noise(tVal, tVal, tVal);
-        // Ridged: invert the absolute value
         const ridged = 1.0 - Math.abs(n);
-
         return new THREE.Vector3(
           this.scaleFactor * ridged * Math.cos(tVal),
           this.scaleFactor * ridged * Math.sin(tVal),
@@ -561,6 +621,105 @@
         );
       }
       update(deltaTime, time) {}
+    }
+
+    /************************************
+     * NEW EQUATION CLASSES (from snippet)
+     ************************************/
+    class SineDistortionEquation extends EquationBase {
+      constructor() {
+        super();
+        this.offsetX = 0;
+        this.offsetY = -100;
+        this.kDiv = 8;
+        this.kSub = 12;
+        this.scaleFactor = 0.7;
+        this.xAmplitude = 20;
+        this.yAmplitude = 20;
+      }
+      getContribution(index, totalPoints, time) {
+        const dimension = Math.floor(Math.sqrt(this.pointCount));
+        const row = Math.floor(index / dimension);
+        const col = index % dimension;
+        let px = col - dimension/2 + this.offsetX;
+        let py = row - dimension/2 + this.offsetY;
+        let pz = 0;
+        const tVal = time * this.speed;
+        const k = px / this.kDiv - this.kSub;
+        const e = py / this.kDiv - this.kSub;
+        px += Math.sin(k + tVal) * this.xAmplitude;
+        py += Math.cos(e + tVal) * this.yAmplitude;
+        px *= this.scaleFactor;
+        py *= this.scaleFactor;
+        return new THREE.Vector3(px, py, pz);
+      }
+    }
+
+    class PhaseRippleEquation extends EquationBase {
+      constructor() {
+        super();
+        this.phaseFactor = 0.1;
+        this.xAmplitude = 20;
+        this.yAmplitude = 20;
+      }
+      getContribution(index, totalPoints, time) {
+        const dimension = Math.floor(Math.sqrt(this.pointCount));
+        const row = Math.floor(index / dimension);
+        const col = index % dimension;
+        let px = col - dimension/2;
+        let py = row - dimension/2;
+        let pz = 0;
+        const tVal = time * this.speed;
+        const phase = Math.sin((px / 10) + (py / 10) * this.phaseFactor + tVal);
+        px += phase * this.xAmplitude;
+        py += phase * this.yAmplitude;
+        return new THREE.Vector3(px, py, pz);
+      }
+    }
+
+    class ZSineWarpEquation extends EquationBase {
+      constructor() {
+        super();
+        this.zAmplitude = 30;
+        this.frequency = 0.5;
+      }
+      getContribution(index, totalPoints, time) {
+        const dimension = Math.floor(Math.sqrt(this.pointCount));
+        const row = Math.floor(index / dimension);
+        const col = index % dimension;
+        let px = col - dimension/2;
+        let py = row - dimension/2;
+        const tVal = time * this.speed;
+        const pz = Math.sin(tVal * this.frequency + (px * py) / 10000) * this.zAmplitude;
+        return new THREE.Vector3(px, py, pz);
+      }
+    }
+
+    class RadialTwistEquation extends EquationBase {
+      constructor() {
+        super();
+        this.radialFactor = 0.5;
+        this.twistFactor = 2;
+        this.zWaveFrequency = 0.3;
+        this.zWaveAmplitude = 20;
+      }
+      getContribution(index, totalPoints, time) {
+        const dimension = Math.floor(Math.sqrt(this.pointCount));
+        const row = Math.floor(index / dimension);
+        const col = index % dimension;
+        let px = col - dimension/2;
+        let py = row - dimension/2;
+        let pz = 0;
+        const tVal = time * this.speed;
+        const radius = Math.sqrt(px + py*py);
+        const angle = Math.atan2(py, px) + this.twistFactor * radius + tVal * this.radialFactor;
+        const oldPx = px;
+        const oldPy = py;
+        px += radius * Math.cos(angle) - oldPx;
+        py += radius * Math.sin(angle) - oldPy;
+        pz += Math.sin(radius * this.zWaveFrequency + tVal) * this.zWaveAmplitude;
+        return new THREE.Vector3(px, py, pz);
+      }
     }
 
     class TorusEquation extends EquationBase {
@@ -618,10 +777,7 @@
       constructor(scene, eqModules){
         this.scene = scene;
         this.eqModules = eqModules;
-
-        this.instancedMesh = null;  // Original sphere system
-
-        // Glow points references
+        this.instancedMesh = null;
         this.points = null;
         this.geometry = null;
         this.material = null;
@@ -635,13 +791,10 @@
         canvas.width = size;
         canvas.height = size;
         const ctx = canvas.getContext('2d');
-
         const gradient = ctx.createRadialGradient(
           size / 2, size / 2, 0,
           size / 2, size / 2, size / 2
         );
-
-        // Grab user-defined stops
         const stop0Pos   = parseFloat(document.getElementById('glowStop0Pos').value);
         const stop0Alpha = parseFloat(document.getElementById('glowStop0Alpha').value);
         const stop1Pos   = parseFloat(document.getElementById('glowStop1Pos').value);
@@ -650,15 +803,12 @@
         const stop2Alpha = parseFloat(document.getElementById('glowStop2Alpha').value);
         const stop3Pos   = parseFloat(document.getElementById('glowStop3Pos').value);
         const stop3Alpha = parseFloat(document.getElementById('glowStop3Alpha').value);
-
         gradient.addColorStop(stop0Pos, `rgba(255,255,255,${stop0Alpha})`);
         gradient.addColorStop(stop1Pos, `rgba(255,255,255,${stop1Alpha})`);
         gradient.addColorStop(stop2Pos, `rgba(255,255,255,${stop2Alpha})`);
         gradient.addColorStop(stop3Pos, `rgba(255,255,255,${stop3Alpha})`);
-
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, size, size);
-
         return new THREE.CanvasTexture(canvas);
       }
 
@@ -669,8 +819,6 @@
         const globalSpeed = parseFloat(document.getElementById("globalSpeed").value);
         GLOBAL_SPEED = globalSpeed;
         const time = globalTime * globalSpeed;
-
-        // Collect contributions
         for(let i = 0; i < globalPointCount; i++){
           let finalPos = new THREE.Vector3(0, 0, 0);
           this.eqModules.forEach(mod => {
@@ -692,8 +840,6 @@
           mergedPositions[i*3 + 1] = finalPos.y;
           mergedPositions[i*3 + 2] = finalPos.z;
         }
-
-        // Generate color palette
         const paletteSize = 2000;
         const palette = [];
         const baseHue = parseFloat(document.getElementById("globalColor").value);
@@ -710,42 +856,31 @@
           mergedColors[i*3+1] = palette[paletteIndex].g;
           mergedColors[i*3+2] = palette[paletteIndex].b;
         }
-
-        // Compute disk size + potential sound expansion
         const diskSize = parseFloat(document.getElementById('globalSphereSize').value);
         let modulatedSize = diskSize;
         if(document.getElementById("soundEffectScale").checked && typeof window.soundModBass !== "undefined"){
           const expansionFactor = parseFloat(document.getElementById("soundExpansionFactor").value);
           modulatedSize = diskSize*(1 + window.soundModBass*expansionFactor);
         }
-
-        // Check user preference for glow or spheres
         const useGlow = document.getElementById('useGlowPoints').checked;
-
         if(useGlow) {
-          // Remove old sphere mesh if present
           if(this.instancedMesh) {
             this.scene.remove(this.instancedMesh);
             this.instancedMesh.geometry.dispose();
             this.instancedMesh.material.dispose();
             this.instancedMesh = null;
           }
-
-          // Create or re-create the Points geometry/material if needed
           if(!this.points || !this.positions || (this.positions.length/3 !== globalPointCount)) {
             if(this.points) {
               this.scene.remove(this.points);
               this.geometry.dispose();
               this.material.dispose();
             }
-
             this.positions = new Float32Array(globalPointCount * 3);
             this.colors = new Float32Array(globalPointCount * 3);
-
             this.geometry = new THREE.BufferGeometry();
             this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
             this.geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
-
             this.material = new THREE.PointsMaterial({
               size: 4.0,
               vertexColors: true,
@@ -755,12 +890,9 @@
               depthTest: true,
               depthWrite: false
             });
-
             this.points = new THREE.Points(this.geometry, this.material);
             this.scene.add(this.points);
           }
-
-          // Update positions & colors
           for(let i=0; i < globalPointCount; i++){
             this.positions[i*3]   = mergedPositions[i*3];
             this.positions[i*3+1] = mergedPositions[i*3+1];
@@ -769,14 +901,9 @@
             this.colors[i*3+1]    = mergedColors[i*3+1];
             this.colors[i*3+2]    = mergedColors[i*3+2];
           }
-
           this.geometry.attributes.position.needsUpdate = true;
           this.geometry.attributes.color.needsUpdate = true;
-
-          // Adjust size
           this.material.size = 4.0 * modulatedSize;
-
-          // Sound-based "emissive" effect via opacity
           if(document.getElementById("soundEffectEmissive").checked){
             let sensitivity = parseFloat(document.getElementById("soundSensitivity").value);
             this.material.opacity = 0.15 + (window.soundMod || 0)*sensitivity;
@@ -784,9 +911,7 @@
           } else {
             this.material.opacity = 1.0;
           }
-
         } else {
-          // If not using glow, remove points if present
           if(this.points) {
             this.scene.remove(this.points);
             this.geometry.dispose();
@@ -797,8 +922,6 @@
             this.positions = null;
             this.colors = null;
           }
-
-          // Instanced spheres logic
           if(!this.instancedMesh || this.instancedMesh.count !== globalPointCount){
             if(this.instancedMesh){
               this.scene.remove(this.instancedMesh);
@@ -826,7 +949,6 @@
             this.instancedMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(globalPointCount*3), 3);
             this.scene.add(this.instancedMesh);
           }
-
           const dummyObj = new THREE.Object3D();
           for(let i = 0; i < globalPointCount; i++){
             dummyObj.position.set(
@@ -846,8 +968,6 @@
           }
           this.instancedMesh.instanceMatrix.needsUpdate = true;
           this.instancedMesh.instanceColor.needsUpdate = true;
-
-          // Emissive intensity
           if(document.getElementById("soundEffectEmissive").checked){
             let sensitivity = parseFloat(document.getElementById("soundSensitivity").value);
             this.instancedMesh.material.emissiveIntensity = window.soundMod === null ? 0.15 : window.soundMod*sensitivity;
@@ -893,22 +1013,16 @@
         }
         const THRESHOLD_DB = -60;
         window.soundMod = maxDb < THRESHOLD_DB ? 0 : (maxDb - THRESHOLD_DB)/(0 - THRESHOLD_DB);
-
-        // Bass
         let bassMax = -Infinity;
         for(let i = 0; i < 40; i++){
           if(this.frequencyData[i] > bassMax) bassMax = this.frequencyData[i];
         }
         window.soundModBass = bassMax < THRESHOLD_DB ? 0 : (bassMax - THRESHOLD_DB)/(0 - THRESHOLD_DB);
-
-        // Mid
         let midMax = -Infinity;
         for(let i = 41; i < 200 && i < this.frequencyData.length; i++){
           if(this.frequencyData[i] > midMax) midMax = this.frequencyData[i];
         }
         window.soundModMid = midMax < THRESHOLD_DB ? 0 : (midMax - THRESHOLD_DB)/(0 - THRESHOLD_DB);
-
-        // High
         let highMax = -Infinity;
         for(let i = 300; i < this.frequencyData.length; i++){
           if(this.frequencyData[i] > highMax) highMax = this.frequencyData[i];
@@ -926,9 +1040,9 @@
     /**************** Persistent Settings & Favorites ****************/
     function saveSettings(){
       const settings = {};
-      // Skip saving fullscreenToggle
       document.querySelectorAll('#controlPanel input').forEach(input=>{
-        if(input.id === "fullscreenToggle") return; // exclude it
+        if(input.id === "fullscreenToggle") return;
+        if(input.id === "screenStaysActive") return;
         if(input.type==="checkbox") {
           settings[input.id] = input.checked;
         } else {
@@ -955,6 +1069,8 @@
       }
       localStorage.setItem('visualizationSettings', JSON.stringify(settings));
     }
+    // Expose saveSettings globally for non-module scripts
+    window.saveSettings = saveSettings;
 
     function loadSettings(){
       const settingsStr = localStorage.getItem('visualizationSettings');
@@ -962,7 +1078,7 @@
         const settings = JSON.parse(settingsStr);
         for(const id in settings){
           if(id==="camera") continue;
-          if(id==="fullscreenToggle") continue; // skip if older version stored it
+          if(id==="fullscreenToggle") continue;
           const element = document.getElementById(id);
           if(element){
             if(element.type==="checkbox"){
@@ -987,9 +1103,8 @@
 
     function saveFavorite(){
       const fav = {};
-      // Skip saving fullscreenToggle
       document.querySelectorAll('#controlPanel input').forEach(input=>{
-        if(input.id === "fullscreenToggle") return; // exclude it from favorites
+        if(input.id === "fullscreenToggle") return;
         fav[input.id] = (input.type==="checkbox") ? input.checked : input.value;
       });
       document.querySelectorAll('#controlPanel select').forEach(select=>{
@@ -1030,7 +1145,7 @@
           setTimeout(()=>{
             for(const id in fav){
               if(id==="camera") continue;
-              if(id==="fullscreenToggle") continue; // skip loading it
+              if(id==="fullscreenToggle") continue;
               const element = document.getElementById(id);
               if(element){
                 if(element.type==="checkbox"){
@@ -1093,8 +1208,6 @@
           const content = document.getElementById('globalSettings');
           content.style.display = (content.style.display==='block') ? 'none' : 'block';
         });
-
-        // Fullscreen toggle logic remains but is no longer saved
         document.getElementById('fullscreenToggle').addEventListener('change', (e) => {
           if(e.target.checked) {
             if(document.documentElement.requestFullscreen) {
@@ -1113,9 +1226,7 @@
               document.msExitFullscreen();
             }
           }
-          // We do NOT call saveSettings() for fullscreen; user can set it session-only
         });
-
         const eqContainer = document.getElementById('eqModules');
         this.eqModules.forEach(mod=>{
           const header = document.createElement('div');
@@ -1136,27 +1247,11 @@
           content.className = 'moduleContent';
           content.id = mod.id;
           let innerHTML = "";
-          
-          // Rossler special
-          if(mod.id === "rossler"){
-            innerHTML += `
-              <div class="controlElement">
-                <label>Speed: <input type="range" id="${mod.id}_speed" min="0" max="1" step="0.0001" value="${mod.instance.speed}"></label>
-              </div>
-              <div class="controlElement">
-                <label>Jitter Factor: <input type="range" id="${mod.id}_jitterFactor" min="0.05" max="3" step="0.001" value="${mod.instance.jitterFactor}"></label>
-              </div>
-            `;
-          } else {
-            // Default Speed control
-            innerHTML += `
-              <div class="controlElement">
-                <label>Speed: <input type="range" id="${mod.id}_speed" min="0" max="2.0" step="0.001" value="${mod.instance.speed}"></label>
-              </div>
-            `;
-          }
-
-          // Additional param wiring
+          innerHTML += `
+            <div class="controlElement">
+              <label>Speed: <input type="range" id="${mod.id}_speed" min="0" max="2.0" step="0.001" value="${mod.instance.speed}"></label>
+            </div>
+          `;
           switch(mod.id){
             case "lissajous":
               innerHTML += `
@@ -1281,8 +1376,10 @@
               `;
               break;
             case "rossler":
-              // Already included above for speed & jitterFactor
               innerHTML += `
+                <div class="controlElement">
+                  <label>Jitter Factor: <input type="range" id="${mod.id}_jitterFactor" min="0.05" max="3" step="0.001" value="${mod.instance.jitterFactor}"></label>
+                </div>
                 <div class="controlElement">
                   <label>a: <input type="range" id="${mod.id}_a" min="0.1" max="0.35" step="0.001" value="${mod.instance.a}"></label>
                 </div>
@@ -1294,15 +1391,106 @@
                 </div>
               `;
               break;
-            default:
+            case "sineDistortion":
+              innerHTML += `
+                <div class="controlElement">
+                  <label>Offset X:
+                    <input type="range" id="${mod.id}_offsetX" min="-200" max="200" step="1" value="${mod.instance.offsetX}">
+                  </label>
+                </div>
+                <div class="controlElement">
+                  <label>Offset Y:
+                    <input type="range" id="${mod.id}_offsetY" min="-200" max="200" step="1" value="${mod.instance.offsetY}">
+                  </label>
+                </div>
+                <div class="controlElement">
+                  <label>kDiv:
+                    <input type="range" id="${mod.id}_kDiv" min="0" max="50" step="0.001" value="${mod.instance.kDiv}">
+                  </label>
+                </div>
+                <div class="controlElement">
+                  <label>kSub:
+                    <input type="range" id="${mod.id}_kSub" min="0" max="50" step="0.001" value="${mod.instance.kSub}">
+                  </label>
+                </div>
+                <div class="controlElement">
+                  <label>Scale Factor:
+                    <input type="range" id="${mod.id}_scaleFactor" min="0" max="5" step="0.001" value="${mod.instance.scaleFactor}">
+                  </label>
+                </div>
+                <div class="controlElement">
+                  <label>X Amplitude:
+                    <input type="range" id="${mod.id}_xAmplitude" min="0" max="50" step="0.001" value="${mod.instance.xAmplitude}">
+                  </label>
+                </div>
+                <div class="controlElement">
+                  <label>Y Amplitude:
+                    <input type="range" id="${mod.id}_yAmplitude" min="0" max="50" step="0.001" value="${mod.instance.yAmplitude}">
+                  </label>
+                </div>
+              `;
+              break;
+            case "phaseRipple":
+              innerHTML += `
+                <div class="controlElement">
+                  <label>Phase Factor:
+                    <input type="range" id="${mod.id}_phaseFactor" min="0" max="1" step="0.001" value="${mod.instance.phaseFactor}">
+                  </label>
+                </div>
+                <div class="controlElement">
+                  <label>X Amplitude:
+                    <input type="range" id="${mod.id}_xAmplitude" min="0" max="50" step="0.001" value="${mod.instance.xAmplitude}">
+                  </label>
+                </div>
+                <div class="controlElement">
+                  <label>Y Amplitude:
+                    <input type="range" id="${mod.id}_yAmplitude" min="0" max="50" step="0.001" value="${mod.instance.yAmplitude}">
+                  </label>
+                </div>
+              `;
+              break;
+            case "zSineWarp":
+              innerHTML += `
+                <div class="controlElement">
+                  <label>Z Amplitude:
+                    <input type="range" id="${mod.id}_zAmplitude" min="0" max="100" step="0.001" value="${mod.instance.zAmplitude}">
+                  </label>
+                </div>
+                <div class="controlElement">
+                  <label>Frequency:
+                    <input type="range" id="${mod.id}_frequency" min="0" max="5" step="0.001" value="${mod.instance.frequency}">
+                  </label>
+                </div>
+              `;
+              break;
+            case "radialTwist":
+              innerHTML += `
+                <div class="controlElement">
+                  <label>Radial Factor:
+                    <input type="range" id="${mod.id}_radialFactor" min="0" max="5" step="0.001" value="${mod.instance.radialFactor}">
+                  </label>
+                </div>
+                <div class="controlElement">
+                  <label>Twist Factor:
+                    <input type="range" id="${mod.id}_twistFactor" min="0" max="10" step="0.001" value="${mod.instance.twistFactor}">
+                  </label>
+                </div>
+                <div class="controlElement">
+                  <label>Z Wave Freq:
+                    <input type="range" id="${mod.id}_zWaveFrequency" min="0" max="5" step="0.001" value="${mod.instance.zWaveFrequency}">
+                  </label>
+                </div>
+                <div class="controlElement">
+                  <label>Z Wave Amp:
+                    <input type="range" id="${mod.id}_zWaveAmplitude" min="0" max="50" step="0.001" value="${mod.instance.zWaveAmplitude}">
+                  </label>
+                </div>
+              `;
               break;
           }
-
           content.innerHTML = innerHTML;
           eqContainer.appendChild(header);
           eqContainer.appendChild(content);
-
-          // Speed slider
           const speedInput = content.querySelector(`#${mod.id}_speed`);
           if(speedInput){
             speedInput.addEventListener('input', (e) => { 
@@ -1310,7 +1498,6 @@
               saveSettings();
             });
           }
-          // Specialized param wiring
           if(mod.id === "rossler"){
             content.querySelector(`#${mod.id}_jitterFactor`).addEventListener('input', (e) => {
               const newVal = parseFloat(e.target.value);
@@ -1385,16 +1572,34 @@
           } else if(mod.id === "torus"){
             content.querySelector(`#${mod.id}_R`).addEventListener('input', (e) => { mod.instance.R = parseFloat(e.target.value); saveSettings(); });
             content.querySelector(`#${mod.id}_r`).addEventListener('input', (e) => { mod.instance.r = parseFloat(e.target.value); saveSettings(); });
+          } 
+          else if(mod.id === "sineDistortion"){
+            content.querySelector(`#${mod.id}_offsetX`).addEventListener('input', (e) => { mod.instance.offsetX = parseFloat(e.target.value); saveSettings(); });
+            content.querySelector(`#${mod.id}_offsetY`).addEventListener('input', (e) => { mod.instance.offsetY = parseFloat(e.target.value); saveSettings(); });
+            content.querySelector(`#${mod.id}_kDiv`).addEventListener('input', (e) => { mod.instance.kDiv = parseFloat(e.target.value); saveSettings(); });
+            content.querySelector(`#${mod.id}_kSub`).addEventListener('input', (e) => { mod.instance.kSub = parseFloat(e.target.value); saveSettings(); });
+            content.querySelector(`#${mod.id}_scaleFactor`).addEventListener('input', (e) => { mod.instance.scaleFactor = parseFloat(e.target.value); saveSettings(); });
+            content.querySelector(`#${mod.id}_xAmplitude`).addEventListener('input', (e) => { mod.instance.xAmplitude = parseFloat(e.target.value); saveSettings(); });
+            content.querySelector(`#${mod.id}_yAmplitude`).addEventListener('input', (e) => { mod.instance.yAmplitude = parseFloat(e.target.value); saveSettings(); });
+          } else if(mod.id === "phaseRipple"){
+            content.querySelector(`#${mod.id}_phaseFactor`).addEventListener('input', (e) => { mod.instance.phaseFactor = parseFloat(e.target.value); saveSettings(); });
+            content.querySelector(`#${mod.id}_xAmplitude`).addEventListener('input', (e) => { mod.instance.xAmplitude = parseFloat(e.target.value); saveSettings(); });
+            content.querySelector(`#${mod.id}_yAmplitude`).addEventListener('input', (e) => { mod.instance.yAmplitude = parseFloat(e.target.value); saveSettings(); });
+          } else if(mod.id === "zSineWarp"){
+            content.querySelector(`#${mod.id}_zAmplitude`).addEventListener('input', (e) => { mod.instance.zAmplitude = parseFloat(e.target.value); saveSettings(); });
+            content.querySelector(`#${mod.id}_frequency`).addEventListener('input', (e) => { mod.instance.frequency = parseFloat(e.target.value); saveSettings(); });
+          } else if(mod.id === "radialTwist"){
+            content.querySelector(`#${mod.id}_radialFactor`).addEventListener('input', (e) => { mod.instance.radialFactor = parseFloat(e.target.value); saveSettings(); });
+            content.querySelector(`#${mod.id}_twistFactor`).addEventListener('input', (e) => { mod.instance.twistFactor = parseFloat(e.target.value); saveSettings(); });
+            content.querySelector(`#${mod.id}_zWaveFrequency`).addEventListener('input', (e) => { mod.instance.zWaveFrequency = parseFloat(e.target.value); saveSettings(); });
+            content.querySelector(`#${mod.id}_zWaveAmplitude`).addEventListener('input', (e) => { mod.instance.zWaveAmplitude = parseFloat(e.target.value); saveSettings(); });
           }
-          // Expand/collapse logic
           header.addEventListener('click', function(e){
             if(e.target !== enableCheckbox){
               content.style.display = (content.style.display==='block') ? 'none' : 'block';
             }
           });
         });
-
-        // Sound Module events
         document.getElementById('soundEnable').addEventListener('change', (e) => { 
           this.soundModule.enabled = e.target.checked; 
           saveSettings();
@@ -1404,24 +1609,19 @@
           saveSettings();
         });
         document.getElementById('soundExpansionFactor').addEventListener('input', saveSettings);
-
         document.getElementById('startAudio').addEventListener('click', () => {
           this.soundModule.init();
           document.getElementById('startAudio').disabled = true;
         });
-
         document.querySelectorAll('.moduleHeader[data-target="soundModule"]').forEach(header => {
           header.addEventListener('click', function(){
             const soundContent = document.getElementById('soundModule');
             soundContent.style.display = (soundContent.style.display==='block') ? 'none' : 'block';
           });
         });
-
-        // Glow Points Settings - Show/hide & dynamic texture
         const glowCheckbox = document.getElementById('useGlowPoints');
         const glowPointsHeader = document.getElementById('glowPointsHeader');
         const glowPointsSettings = document.getElementById('glowPointsSettings');
-
         glowCheckbox.addEventListener('change', () => {
           if(glowCheckbox.checked) {
             glowPointsHeader.style.display = 'block';
@@ -1432,21 +1632,17 @@
           }
           saveSettings();
         });
-
         glowPointsHeader.addEventListener('click', () => {
           if(!glowCheckbox.checked) return;
           glowPointsSettings.style.display = (
             glowPointsSettings.style.display === 'block'
           ) ? 'none' : 'block';
         });
-
-        // Auto-close on mouseleave
         glowPointsSettings.addEventListener('mouseleave', () => {
           if(glowCheckbox.checked) {
             glowPointsSettings.style.display = 'none';
           }
         });
-
         [
           'glowStop0Pos','glowStop0Alpha',
           'glowStop1Pos','glowStop1Alpha',
@@ -1465,8 +1661,6 @@
             }
           });
         });
-
-        // Fire an input event so the final UI state is consistent
         document.getElementById('controlPanel').addEventListener('input', saveSettings);
         document.getElementById('saveFavorite').addEventListener('click', saveFavorite);
         updateFavoriteList();
@@ -1480,23 +1674,17 @@
         this.scene.background = new THREE.Color(0x000000);
         this.camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 10000);
         this.camera.position.set(0,0,300);
-
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(this.renderer.domElement);
-
-        // OrbitControls
         this.controls = new OrbitControls(this.camera, this.renderer.domElement);
         this.controls.enableDamping = true;
         this.controls.dampingFactor = 0.1;
-
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
         this.scene.add(ambientLight);
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
         directionalLight.position.set(100,100,100);
         this.scene.add(directionalLight);
-
-        // Instantiate equation modules
         this.lissajous = new LissajousEquation();
         this.roseCurve = new RoseCurveEquation();
         this.spiral = new SpiralEquation();
@@ -1505,37 +1693,38 @@
         this.lorenz = new LorenzAttractorEquation();
         this.reactionDiffusion = new ReactionDiffusionEquation();
         this.noiseEq = new NoiseEquation();
-        // Fractal & Ridged
         this.fractalNoise = new FractalNoiseEquation();
         this.ridgedNoise = new RidgedNoiseEquation();
-
         this.torusEq = new TorusEquation();
         this.rossler = new RosslerEquation();
         this.rossler.baseJitterFactor = this.rossler.jitterFactor;
-
+        this.sineDistortion = new SineDistortionEquation();
+        this.phaseRipple   = new PhaseRippleEquation();
+        this.zSineWarp     = new ZSineWarpEquation();
+        this.radialTwist   = new RadialTwistEquation();
         this.eqModules = [
-          { id: "lissajous", name: "Lissajous Equation", instance: this.lissajous },
-          { id: "roseCurve", name: "Rose Curve", instance: this.roseCurve },
-          { id: "spiral", name: "Spiral Equation", instance: this.spiral },
-          { id: "fourierSeries", name: "Fourier Series", instance: this.fourierSeries },
-          { id: "shm", name: "Simple Harmonic Motion", instance: this.shm },
-          { id: "lorenz", name: "Lorenz Attractor", instance: this.lorenz },
-          { id: "reactionDiffusion", name: "Reaction-Diffusion", instance: this.reactionDiffusion },
-          { id: "noiseEq", name: "Simplex Noise", instance: this.noiseEq },
-          { id: "fractalNoise", name: "Fractal Noise", instance: this.fractalNoise },
-          { id: "ridgedNoise", name: "Ridged Noise", instance: this.ridgedNoise },
-          { id: "torus", name: "Torus Equation", instance: this.torusEq },
-          { id: "rossler", name: "Rossler Attractor", instance: this.rossler }
+          { id: "lissajous",        name: "Lissajous Equation",     instance: this.lissajous },
+          { id: "roseCurve",        name: "Rose Curve",             instance: this.roseCurve },
+          { id: "spiral",           name: "Spiral Equation",        instance: this.spiral },
+          { id: "fourierSeries",    name: "Fourier Series",         instance: this.fourierSeries },
+          { id: "shm",              name: "Simple Harmonic Motion", instance: this.shm },
+          { id: "lorenz",           name: "Lorenz Attractor",       instance: this.lorenz },
+          { id: "reactionDiffusion",name: "Reaction-Diffusion",     instance: this.reactionDiffusion },
+          { id: "noiseEq",          name: "Simplex Noise",          instance: this.noiseEq },
+          { id: "fractalNoise",     name: "Fractal Noise",          instance: this.fractalNoise },
+          { id: "ridgedNoise",      name: "Ridged Noise",           instance: this.ridgedNoise },
+          { id: "torus",            name: "Torus Equation",         instance: this.torusEq },
+          { id: "rossler",          name: "Rossler Attractor",      instance: this.rossler },
+          { id: "sineDistortion",   name: "Sine Distortion",        instance: this.sineDistortion },
+          { id: "phaseRipple",      name: "Phase Ripple",           instance: this.phaseRipple },
+          { id: "zSineWarp",        name: "Z-Sine Warp",            instance: this.zSineWarp },
+          { id: "radialTwist",      name: "Radial Twist",           instance: this.radialTwist }
         ];
-
         this.integrationModule = new IntegrationModule(this.scene, this.eqModules);
         this.soundModule = new SoundModule();
-
         window.addEventListener('resize', this.onWindowResize.bind(this), false);
-
         this.lastTime = performance.now();
         this.globalTime = 0;
-
         this.animate();
       }
 
@@ -1551,11 +1740,8 @@
         const deltaTime = (currentTime - this.lastTime)/1000;
         this.lastTime = currentTime;
         this.globalTime += deltaTime;
-
         this.integrationModule.update(deltaTime, this.globalTime);
         this.soundModule.update(deltaTime);
-
-        // Rossler jitter modulation
         const jitterEnableEl = document.getElementById('soundJitterEnable');
         if(
           jitterEnableEl && jitterEnableEl.checked &&
@@ -1588,7 +1774,6 @@
         } else {
           this.rossler.jitterFactor = this.rossler.baseJitterFactor;
         }
-
         this.controls.update();
         this.renderer.render(this.scene, this.camera);
       }
@@ -1602,7 +1787,6 @@
       loadSettings();
     });
 
-    // Hide cursor except on control panel hover
     document.body.classList.add('hide-cursor');
     const controlPanel = document.getElementById('controlPanel');
     controlPanel.addEventListener('mouseenter', () => {
@@ -1612,18 +1796,12 @@
       document.body.classList.add('hide-cursor');
     });
 
-    /* re-init the animation loop and audio context on return to browser tab from elsewhere */
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") {
-        // 1) Resume the animation loop
         if (window.visualization) {
-          // Reset lastTime so deltaTime doesn't spike
           window.visualization.lastTime = performance.now();
-          // Re-init the rendering loop
           window.visualization.animate();
         }
-
-        // 2) Resume audio context if it's been suspended
         if (window.visualization &&
             window.visualization.soundModule &&
             window.visualization.soundModule.audioContext)
@@ -1636,5 +1814,167 @@
       }
     });
   </script>
+
+  <!-- ===================================================================== -->
+  <!-- ============== SINGLE CHECKBOX WAKE LOCK INTEGRATION ================= -->
+  <!-- ===================================================================== -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const screenStaysActive = document.getElementById('screenStaysActive');
+      let wakeLock = null;
+      const requestWakeLock = async () => {
+        try {
+          wakeLock = await navigator.wakeLock.request('screen');
+        } catch (err) {
+          console.error(`Wake lock request failed: ${err.name}, ${err.message}`);
+        }
+      };
+      const releaseWakeLock = async () => {
+        if (wakeLock !== null) {
+          try {
+            await wakeLock.release();
+            wakeLock = null;
+          } catch (err) {
+            console.error(`Wake lock release failed: ${err.name}, ${err.message}`);
+          }
+        }
+      };
+      const handleVisibilityChange = async () => {
+        if (screenStaysActive.checked && document.visibilityState === 'visible') {
+          await requestWakeLock();
+        }
+      };
+      screenStaysActive.addEventListener('change', async () => {
+        if (screenStaysActive.checked) {
+          await requestWakeLock();
+          document.addEventListener('visibilitychange', handleVisibilityChange);
+        } else {
+          await releaseWakeLock();
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+        }
+      });
+    });
+  </script>
+  <!-- ===================================================================== -->
+
+  <!-- New Script: Slideshow of Favorites -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      let slideshowTimer = null;
+      let slideshowActive = false;
+      let slideshowIndex = 0;
+      let slideshowFavorites = [];
+
+      // This function loads the favorite with a fade out/in (each 0.5s)
+      function loadFavoriteForSlideshow(fav) {
+        document.body.style.transition = "opacity 0.5s ease";
+        document.body.style.opacity = "0";
+        setTimeout(() => {
+          for (const id in fav) {
+            if (id === "camera" || id === "fullscreenToggle") continue;
+            const element = document.getElementById(id);
+            if (element) {
+              if (element.type === "checkbox") {
+                element.checked = fav[id];
+                element.dispatchEvent(new Event('change'));
+              } else {
+                element.value = fav[id];
+                element.dispatchEvent(new Event('input'));
+              }
+            }
+          }
+          if (fav.camera && window.visualization) {
+            const cam = fav.camera;
+            window.visualization.camera.position.set(cam.position.x, cam.position.y, cam.position.z);
+            window.visualization.camera.zoom = cam.zoom;
+            window.visualization.camera.updateProjectionMatrix();
+            window.visualization.controls.target.set(cam.controlsTarget.x, cam.controlsTarget.y, cam.controlsTarget.z);
+            window.visualization.controls.update();
+          }
+          saveSettings();
+          document.body.style.opacity = "1";
+        }, 500);
+      }
+
+      function nextSlideshow() {
+        if (!slideshowActive) return;
+        slideshowFavorites = JSON.parse(localStorage.getItem('favoriteSettings') || '[]');
+        if (slideshowFavorites.length === 0) {
+          cancelSlideshow();
+          return;
+        }
+        if (document.getElementById('slideshowRandom').checked) {
+          slideshowIndex = Math.floor(Math.random() * slideshowFavorites.length);
+        } else {
+          slideshowIndex = (slideshowIndex + 1) % slideshowFavorites.length;
+        }
+        loadFavoriteForSlideshow(slideshowFavorites[slideshowIndex]);
+        const intervalMinutes = parseInt(document.getElementById('slideshowInterval').value, 10);
+        const intervalMs = intervalMinutes * 60 * 1000;
+        slideshowTimer = setTimeout(nextSlideshow, intervalMs);
+      }
+
+      // New cancellation logic: only if the mouse is in the rightmost 100 pixels
+      function mouseMoveCancelHandler(e) {
+        if (e.clientX >= window.innerWidth - 300) {
+          cancelSlideshow();
+        }
+      }
+
+      function startSlideshow() {
+        slideshowFavorites = JSON.parse(localStorage.getItem('favoriteSettings') || '[]');
+        if (slideshowFavorites.length === 0) {
+          alert("No favorites available for slideshow.");
+          return;
+        }
+        slideshowActive = true;
+        slideshowIndex = -1;
+        nextSlideshow();
+        const slideshowButton = document.getElementById('startSlideshow');
+        slideshowButton.style.pointerEvents = "none";
+        setTimeout(() => { slideshowButton.style.pointerEvents = ""; }, 2000);
+        // Hide the control panel and force the mouse cursor to be hidden
+        document.getElementById("controlPanel").style.display = "none";
+        document.body.style.cursor = "none";
+        document.addEventListener('mousemove', mouseMoveCancelHandler);
+      }
+
+      function cancelSlideshow() {
+        slideshowActive = false;
+        if (slideshowTimer) {
+          clearTimeout(slideshowTimer);
+          slideshowTimer = null;
+        }
+        document.removeEventListener('mousemove', mouseMoveCancelHandler);
+        document.getElementById('startSlideshow').textContent = "SLIDESHOW";
+        // Restore the control panel and mouse cursor
+        document.getElementById("controlPanel").style.display = "";
+        document.body.style.cursor = "";
+      }
+
+      const slideshowButton = document.getElementById('startSlideshow');
+      slideshowButton.addEventListener('click', () => {
+        if (!slideshowActive) {
+          startSlideshow();
+          slideshowButton.textContent = "SLIDESHOW (Active)";
+        } else {
+          cancelSlideshow();
+          slideshowButton.textContent = "SLIDESHOW";
+        }
+      });
+    });
+  </script>
+
+  <!-- New Script: Attach Favorites Roll-down Button Listener -->
+  <script>
+    const toggleButton = document.getElementById('toggleFavoriteList');
+    const favoriteListContainer = document.getElementById('favoriteListContainer');
+    if (toggleButton && favoriteListContainer) {
+      toggleButton.addEventListener('click', () => {
+        favoriteListContainer.classList.toggle('open');
+      });
+    }
+  </script>
+
 </body>
 </html>
