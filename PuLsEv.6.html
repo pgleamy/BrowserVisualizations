@@ -1929,26 +1929,36 @@
 
 
 function startSlideshow() {
-  // For fullscreen: if already checked, uncheck it first, then check again.
+  // For fullscreen: if already on, toggle it off then on; otherwise just turn it on.
   const fullscreenToggle = document.getElementById("fullscreenToggle");
   if (fullscreenToggle) {
-    if (fullscreenToggle.checked) {
+    if (fullscreenToggle.checked === true) {
+      // It’s already on: toggle off then on to retrigger behavior.
       fullscreenToggle.checked = false;
       fullscreenToggle.dispatchEvent(new Event("change"));
+      fullscreenToggle.checked = true;
+      fullscreenToggle.dispatchEvent(new Event("change"));
+    } else {
+      // It’s off: simply turn it on.
+      fullscreenToggle.checked = true;
+      fullscreenToggle.dispatchEvent(new Event("change"));
     }
-    fullscreenToggle.checked = true;
-    fullscreenToggle.dispatchEvent(new Event("change"));
   }
 
-  // For "screen stays active": if already checked, uncheck it first, then check again.
+  // For "screen stays active": if already on, toggle it off then on; otherwise just turn it on.
   const screenStaysActive = document.getElementById("screenStaysActive");
   if (screenStaysActive) {
-    if (screenStaysActive.checked) {
+    if (screenStaysActive.checked === true) {
+      // It’s already on: toggle off then on.
       screenStaysActive.checked = false;
       screenStaysActive.dispatchEvent(new Event("change"));
+      screenStaysActive.checked = true;
+      screenStaysActive.dispatchEvent(new Event("change"));
+    } else {
+      // It’s off: simply turn it on.
+      screenStaysActive.checked = true;
+      screenStaysActive.dispatchEvent(new Event("change"));
     }
-    screenStaysActive.checked = true;
-    screenStaysActive.dispatchEvent(new Event("change"));
   }
 
 
