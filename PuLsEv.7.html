@@ -1101,15 +1101,15 @@
       }
     }
 
+    // Modified saveFavorite() to skip slideshow controls
     function saveFavorite(){
       const fav = {};
-      document.querySelectorAll('#controlPanel input').forEach(input => {
-  if (input.id === "fullscreenToggle") return;
-  // Skip saving slideshow settings so they aren’t later reloaded and reset
-  if (input.id === "slideshowRandom" || input.id === "slideshowInterval") return;
-  fav[input.id] = (input.type === "checkbox") ? input.checked : input.value;
-});
-
+      document.querySelectorAll('#controlPanel input').forEach(input=>{
+        if(input.id === "fullscreenToggle") return;
+        // Skip saving slideshow controls so user choices remain intact
+        if(input.id === "slideshowRandom" || input.id === "slideshowInterval") return;
+        fav[input.id] = (input.type==="checkbox") ? input.checked : input.value;
+      });
       document.querySelectorAll('#controlPanel select').forEach(select=>{
         fav[select.id] = select.value;
       });
@@ -1190,6 +1190,38 @@
       updateFavoriteList();
     }
 
+    // Modified loadFavoriteForSlideshow() to skip loading slideshow controls
+    function loadFavoriteForSlideshow(fav) {
+      document.body.style.transition = "opacity 0.5s ease";
+      document.body.style.opacity = "0";
+      setTimeout(() => {
+        for (const id in fav) {
+          // Skip camera, fullscreenToggle, and slideshow controls so they aren’t overwritten
+          if (id === "camera" || id === "fullscreenToggle" || id === "slideshowRandom" || id === "slideshowInterval") continue;
+          const element = document.getElementById(id);
+          if (element) {
+            if (element.type === "checkbox") {
+              element.checked = fav[id];
+              element.dispatchEvent(new Event('change'));
+            } else {
+              element.value = fav[id];
+              element.dispatchEvent(new Event('input'));
+            }
+          }
+        }
+        if (fav.camera && window.visualization) {
+          const cam = fav.camera;
+          window.visualization.camera.position.set(cam.position.x, cam.position.y, cam.position.z);
+          window.visualization.camera.zoom = cam.zoom;
+          window.visualization.camera.updateProjectionMatrix();
+          window.visualization.controls.target.set(cam.controlsTarget.x, cam.controlsTarget.y, cam.controlsTarget.z);
+          window.visualization.controls.update();
+        }
+        saveSettings();
+        document.body.style.opacity = "1";
+      }, 500);
+    }
+
     /**************** ControlPanel ****************/
     class ControlPanel {
       constructor(eqModules, soundModule){
@@ -1218,7 +1250,7 @@
             } else if(document.documentElement.webkitRequestFullscreen) {
               document.documentElement.webkitRequestFullscreen();
             } else if(document.documentElement.msRequestFullscreen) {
-              document.msRequestFullscreen();
+              document.documentElement.msRequestFullscreen();
             }
           } else {
             if(document.exitFullscreen) {
@@ -1874,20 +1906,19 @@
         document.body.style.opacity = "0";
         setTimeout(() => {
           for (const id in fav) {
-  // Do not change camera, fullscreen, or slideshow controls
-  if (id === "camera" || id === "fullscreenToggle" || id === "slideshowRandom" || id === "slideshowInterval") continue;
-  const element = document.getElementById(id);
-  if (element) {
-    if (element.type === "checkbox") {
-      element.checked = fav[id];
-      element.dispatchEvent(new Event('change'));
-    } else {
-      element.value = fav[id];
-      element.dispatchEvent(new Event('input'));
-    }
-  }
-}
-
+            // Skip camera, fullscreenToggle, and slideshow controls so they aren’t overwritten
+            if (id === "camera" || id === "fullscreenToggle" || id === "slideshowRandom" || id === "slideshowInterval") continue;
+            const element = document.getElementById(id);
+            if (element) {
+              if (element.type === "checkbox") {
+                element.checked = fav[id];
+                element.dispatchEvent(new Event('change'));
+              } else {
+                element.value = fav[id];
+                element.dispatchEvent(new Event('input'));
+              }
+            }
+          }
           if (fav.camera && window.visualization) {
             const cam = fav.camera;
             window.visualization.camera.position.set(cam.position.x, cam.position.y, cam.position.z);
@@ -1919,48 +1950,45 @@
         slideshowTimer = setTimeout(nextSlideshow, intervalMs);
       }
 
-      // New cancellation logic: only if the mouse is in the rightmost 100 pixels
+      // New cancellation logic: only if the mouse is in the rightmost 300 pixels
       function mouseMoveCancelHandler(e) {
         if (e.clientX >= window.innerWidth - 300) {
           cancelSlideshow();
         }
       }
 
+      function startSlideshow() {
+        // For fullscreen: if already on, toggle it off then on with a delay; otherwise simply turn it on.
+        const fullscreenToggle = document.getElementById("fullscreenToggle");
+        if (fullscreenToggle) {
+          if (fullscreenToggle.checked === true) {
+            fullscreenToggle.checked = false;
+            fullscreenToggle.dispatchEvent(new Event("change"));
+            setTimeout(() => {
+              fullscreenToggle.checked = true;
+              fullscreenToggle.dispatchEvent(new Event("change"));
+            }, 150);
+          } else {
+            fullscreenToggle.checked = true;
+            fullscreenToggle.dispatchEvent(new Event("change"));
+          }
+        }
 
-
-function startSlideshow() {
-  // For fullscreen: if already on, toggle it off then on; otherwise just turn it on.
-  const fullscreenToggle = document.getElementById("fullscreenToggle");
-  if (fullscreenToggle) {
-    if (fullscreenToggle.checked === true) {
-      // It’s already on: toggle off then on to retrigger behavior.
-      fullscreenToggle.checked = false;
-      fullscreenToggle.dispatchEvent(new Event("change"));
-      fullscreenToggle.checked = true;
-      fullscreenToggle.dispatchEvent(new Event("change"));
-    } else {
-      // It’s off: simply turn it on.
-      fullscreenToggle.checked = true;
-      fullscreenToggle.dispatchEvent(new Event("change"));
-    }
-  }
-
-  // For "screen stays active": if already on, toggle it off then on; otherwise just turn it on.
-  const screenStaysActive = document.getElementById("screenStaysActive");
-  if (screenStaysActive) {
-    if (screenStaysActive.checked === true) {
-      // It’s already on: toggle off then on.
-      screenStaysActive.checked = false;
-      screenStaysActive.dispatchEvent(new Event("change"));
-      screenStaysActive.checked = true;
-      screenStaysActive.dispatchEvent(new Event("change"));
-    } else {
-      // It’s off: simply turn it on.
-      screenStaysActive.checked = true;
-      screenStaysActive.dispatchEvent(new Event("change"));
-    }
-  }
-
+        // For "screen stays active": if already on, toggle it off then on with a delay; otherwise simply turn it on.
+        const screenStaysActive = document.getElementById("screenStaysActive");
+        if (screenStaysActive) {
+          if (screenStaysActive.checked === true) {
+            screenStaysActive.checked = false;
+            screenStaysActive.dispatchEvent(new Event("change"));
+            setTimeout(() => {
+              screenStaysActive.checked = true;
+              screenStaysActive.dispatchEvent(new Event("change"));
+            }, 150);
+          } else {
+            screenStaysActive.checked = true;
+            screenStaysActive.dispatchEvent(new Event("change"));
+          }
+        }
 
         slideshowFavorites = JSON.parse(localStorage.getItem('favoriteSettings') || '[]');
         if (slideshowFavorites.length === 0) {
@@ -1991,8 +2019,6 @@ function startSlideshow() {
         document.getElementById("controlPanel").style.display = "";
         document.body.style.cursor = "";
       }
-
-
 
       const slideshowButton = document.getElementById('startSlideshow');
       slideshowButton.addEventListener('click', () => {
