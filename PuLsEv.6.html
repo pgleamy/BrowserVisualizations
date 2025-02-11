@@ -1926,7 +1926,32 @@
         }
       }
 
-      function startSlideshow() {
+
+
+function startSlideshow() {
+  // For fullscreen: if already checked, uncheck it first, then check again.
+  const fullscreenToggle = document.getElementById("fullscreenToggle");
+  if (fullscreenToggle) {
+    if (fullscreenToggle.checked) {
+      fullscreenToggle.checked = false;
+      fullscreenToggle.dispatchEvent(new Event("change"));
+    }
+    fullscreenToggle.checked = true;
+    fullscreenToggle.dispatchEvent(new Event("change"));
+  }
+
+  // For "screen stays active": if already checked, uncheck it first, then check again.
+  const screenStaysActive = document.getElementById("screenStaysActive");
+  if (screenStaysActive) {
+    if (screenStaysActive.checked) {
+      screenStaysActive.checked = false;
+      screenStaysActive.dispatchEvent(new Event("change"));
+    }
+    screenStaysActive.checked = true;
+    screenStaysActive.dispatchEvent(new Event("change"));
+  }
+
+
         slideshowFavorites = JSON.parse(localStorage.getItem('favoriteSettings') || '[]');
         if (slideshowFavorites.length === 0) {
           alert("No favorites available for slideshow.");
@@ -1956,6 +1981,8 @@
         document.getElementById("controlPanel").style.display = "";
         document.body.style.cursor = "";
       }
+
+
 
       const slideshowButton = document.getElementById('startSlideshow');
       slideshowButton.addEventListener('click', () => {
