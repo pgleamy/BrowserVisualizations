@@ -1103,10 +1103,13 @@
 
     function saveFavorite(){
       const fav = {};
-      document.querySelectorAll('#controlPanel input').forEach(input=>{
-        if(input.id === "fullscreenToggle") return;
-        fav[input.id] = (input.type==="checkbox") ? input.checked : input.value;
-      });
+      document.querySelectorAll('#controlPanel input').forEach(input => {
+  if (input.id === "fullscreenToggle") return;
+  // Skip saving slideshow settings so they aren’t later reloaded and reset
+  if (input.id === "slideshowRandom" || input.id === "slideshowInterval") return;
+  fav[input.id] = (input.type === "checkbox") ? input.checked : input.value;
+});
+
       document.querySelectorAll('#controlPanel select').forEach(select=>{
         fav[select.id] = select.value;
       });
@@ -1871,18 +1874,20 @@
         document.body.style.opacity = "0";
         setTimeout(() => {
           for (const id in fav) {
-            if (id === "camera" || id === "fullscreenToggle") continue;
-            const element = document.getElementById(id);
-            if (element) {
-              if (element.type === "checkbox") {
-                element.checked = fav[id];
-                element.dispatchEvent(new Event('change'));
-              } else {
-                element.value = fav[id];
-                element.dispatchEvent(new Event('input'));
-              }
-            }
-          }
+  // Do not change camera, fullscreen, or slideshow controls
+  if (id === "camera" || id === "fullscreenToggle" || id === "slideshowRandom" || id === "slideshowInterval") continue;
+  const element = document.getElementById(id);
+  if (element) {
+    if (element.type === "checkbox") {
+      element.checked = fav[id];
+      element.dispatchEvent(new Event('change'));
+    } else {
+      element.value = fav[id];
+      element.dispatchEvent(new Event('input'));
+    }
+  }
+}
+
           if (fav.camera && window.visualization) {
             const cam = fav.camera;
             window.visualization.camera.position.set(cam.position.x, cam.position.y, cam.position.z);
