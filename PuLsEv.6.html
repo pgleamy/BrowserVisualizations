@@ -1249,7 +1249,7 @@
           let innerHTML = "";
           innerHTML += `
             <div class="controlElement">
-              <label>Speed: <input type="range" id="${mod.id}_speed" min="0" max="2.0" step="0.001" value="${mod.instance.speed}"></label>
+              <label>Speed: <input type="range" id="${mod.id}_speed" min="0" max="1.5" step="0.001" value="${mod.instance.speed}"></label>
             </div>
           `;
           switch(mod.id){
@@ -1381,13 +1381,13 @@
                   <label>Jitter Factor: <input type="range" id="${mod.id}_jitterFactor" min="0.05" max="3" step="0.001" value="${mod.instance.jitterFactor}"></label>
                 </div>
                 <div class="controlElement">
-                  <label>a: <input type="range" id="${mod.id}_a" min="0.1" max="0.35" step="0.001" value="${mod.instance.a}"></label>
+                  <label>a: <input type="range" id="${mod.id}_a" min="0.1" max="0.3" step="0.001" value="${mod.instance.a}"></label>
                 </div>
                 <div class="controlElement">
-                  <label>b: <input type="range" id="${mod.id}_b" min="0.1" max="1.0" step="0.001" value="${mod.instance.b}"></label>
+                  <label>b: <input type="range" id="${mod.id}_b" min="0.1" max="0.9" step="0.001" value="${mod.instance.b}"></label>
                 </div>
                 <div class="controlElement">
-                  <label>c: <input type="range" id="${mod.id}_c" min="5" max="10.0" step="0.001" value="${mod.instance.c}"></label>
+                  <label>c: <input type="range" id="${mod.id}_c" min="6" max="9" step="0.001" value="${mod.instance.c}"></label>
                 </div>
               `;
               break;
