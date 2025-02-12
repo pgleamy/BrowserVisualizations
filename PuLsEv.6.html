@@ -155,7 +155,7 @@
       <!-- Glow Points Option -->
       <div class="controlElement">
         <label>
-          <input type="checkbox" id="useGlowPoints"> Use Glow Points (instead of Spheres)
+          <input type="checkbox" id="useGlowPoints" checked> Use Glow Points (instead of Spheres)
         </label>
       </div>
 
@@ -1737,6 +1737,27 @@
         this.phaseRipple   = new PhaseRippleEquation();
         this.zSineWarp     = new ZSineWarpEquation();
         this.radialTwist   = new RadialTwistEquation();
+
+
+
+// Defaults at first start
+this.lissajous.enabled = false;
+this.spiral.enabled = false;
+this.fourierSeries.enabled = false;
+this.shm.enabled = false;
+this.lorenz.enabled = false;
+this.reactionDiffusion.enabled = false;
+this.noiseEq.enabled = false;
+this.fractalNoise.enabled = false;
+this.torusEq.enabled = false;
+this.rossler.enabled = false;
+this.sineDistortion.enabled = false;
+this.phaseRipple.enabled = false;
+this.zSineWarp.enabled = false;
+this.radialTwist.enabled = false;
+
+
+
         this.eqModules = [
           { id: "lissajous",        name: "Lissajous Equation",     instance: this.lissajous },
           { id: "roseCurve",        name: "Rose Curve",             instance: this.roseCurve },
