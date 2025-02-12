@@ -223,14 +223,18 @@
 </div>
       </div>
 
-      <!-- Favorite Settings Section -->
-      <div id="favoriteSettingsSection">
-        <button id="saveFavorite">Save Favorite</button>
-        <button id="toggleFavoriteList">Your Favorites</button>
-        <div id="favoriteListContainer">
-          <ul id="favoriteList"></ul>
-        </div>
-      </div>
+<div id="favoriteSettingsSection">
+  <button id="saveFavorite">Save Favorite</button>
+  <button id="toggleFavoriteList">Your Favorites</button>
+  <button id="exportFavorites">Export Favorites</button>
+  <span id="exportStatusText" style="font-size:6.5px; margin-left:2px;"></span>
+  <button id="importFavorites">Import Favorites</button>
+  <span id="importStatusText" style="font-size:6.5px; margin-left:2px;"></span>
+  <input type="file" id="importFavoritesInput" accept="application/json" style="display:none;">
+  <div id="favoriteListContainer">
+    <ul id="favoriteList"></ul>
+  </div>
+</div>
 
     </div>
 
@@ -711,7 +715,8 @@
         let py = row - dimension/2;
         let pz = 0;
         const tVal = time * this.speed;
-        const radius = Math.sqrt(px + py*py);
+        // const radius = Math.sqrt(px + py*py);
+        const radius = Math.sqrt(Math.abs(px + py*py)); // replaced above to avoid NaN error
         const angle = Math.atan2(py, px) + this.twistFactor * radius + tVal * this.radialFactor;
         const oldPx = px;
         const oldPy = py;
@@ -772,7 +777,7 @@
       }
     }
 
-    /**************** IntegrationModule ****************/
+    /**************** IntegrationModule****************/
     class IntegrationModule {
       constructor(scene, eqModules){
         this.scene = scene;
@@ -1182,6 +1187,8 @@
         favList.appendChild(li);
       });
     }
+    // Expose updateFavoriteList to the global scope so non-module scripts can access it.
+    window.updateFavoriteList = updateFavoriteList;
 
     function deleteFavorite(index){
       let favorites = JSON.parse(localStorage.getItem('favoriteSettings') || '[]');
@@ -1745,7 +1752,6 @@
         this.radialTwist   = new RadialTwistEquation();
 
 
-
 // Defaults at first start
 this.lissajous.enabled = false;
 this.spiral.enabled = false;
@@ -2070,6 +2076,81 @@ this.radialTwist.enabled = false;
       });
     }
   </script>
+
+
+
+<!-- New Script: Export/Import Favorites -->
+<script>
+  // Export Favorites: Save the favorites from localStorage to a JSON file.
+  document.getElementById('exportFavorites').addEventListener('click', function() {
+    let favorites = localStorage.getItem('favoriteSettings');
+    if (!favorites) {
+      document.getElementById('exportStatusText').textContent =
+        "No favorites to export (" + new Date().toLocaleTimeString() + ")";
+      return;
+    }
+    let blob = new Blob([favorites], { type: "application/json" });
+    let url = URL.createObjectURL(blob);
+    let a = document.createElement("a");
+    a.href = url;
+    // Setting the download attribute forces the browser to prompt for download.
+    // The suggested filename is "PuLsE-favs.json" but the user can rename it in the Save As dialog.
+    a.download = "PuLsE-favs.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    document.getElementById('exportStatusText').textContent =
+      "Exported at " + new Date().toLocaleTimeString();
+  });
+
+  // Import Favorites: Read a JSON file and merge the imported favorites with existing ones.
+  document.getElementById('importFavorites').addEventListener('click', function() {
+    document.getElementById('importFavoritesInput').click();
+  });
+
+  document.getElementById('importFavoritesInput').addEventListener('change', function(event) {
+    let file = event.target.files[0];
+    if (!file) return;
+    
+    // Accept any file ending with ".json" (case-insensitive)
+    if (!file.name.toLowerCase().endsWith(".json")) {
+      document.getElementById('importStatusText').textContent =
+        "Select a valid .json file (" + new Date().toLocaleTimeString() + ")";
+      event.target.value = ""; // Reset the file input.
+      return;
+    }
+    
+    let reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        let importedFavorites = JSON.parse(e.target.result);
+        // Check for a valid PuLsE favorites file (must be an array)
+        if (!Array.isArray(importedFavorites)) {
+          document.getElementById('importStatusText').textContent =
+            "Invalid file content (" + new Date().toLocaleTimeString() + ")";
+          return;
+        }
+        let currentFavorites = JSON.parse(localStorage.getItem('favoriteSettings') || '[]');
+        // Append the imported favorites to the end.
+        let mergedFavorites = currentFavorites.concat(importedFavorites);
+        localStorage.setItem('favoriteSettings', JSON.stringify(mergedFavorites));
+        updateFavoriteList();
+        document.getElementById('importStatusText').textContent =
+          "Imported at " + new Date().toLocaleTimeString();
+      } catch (err) {
+        document.getElementById('importStatusText').textContent =
+          "Error reading file (" + new Date().toLocaleTimeString() + ")";
+      }
+    };
+    reader.readAsText(file);
+    // Reset the file input so the same file can be re-imported if needed.
+    event.target.value = "";
+  });
+</script>
+
+
+
 
 </body>
 </html>
