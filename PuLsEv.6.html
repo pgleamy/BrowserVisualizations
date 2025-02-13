@@ -96,7 +96,7 @@
   <!-- Control Panel -->
   <div id="controlPanel">
     <!-- Global Settings Panel -->
-    <div class="moduleHeader" data-target="globalSettings" style="position: relative;">
+    <div class="moduleHeader" data-target="globalSettings" style="position: relative; background: #2b2b2b;">
       <span>PuLsE Globals</span>
       <div id="donate-button-container" style="position: absolute; font-size: 10px; top: 2px; right: 2px; z-index: 100;">
         <div id="donate-button"></div>
@@ -238,11 +238,8 @@
 
     </div>
 
-    <!-- Equation Modules Container -->
-    <div id="eqModules"></div>
-
     <!-- Sound Module Panel -->
-    <div class="moduleHeader" data-target="soundModule">Sound Module</div>
+    <div class="moduleHeader" data-target="soundModule" style="background: #2b2b2b;">Sound Module</div>
     <div id="soundModule" class="moduleContent">
       <div class="controlElement">
         <label>
@@ -298,6 +295,10 @@
         <button id="startAudio" style="padding:4px 8px; font-size:11px;">Start Audio</button>
       </div>
     </div>
+
+    <!-- Equation Modules Container -->
+    <div id="eqModules"></div>
+
   </div>
 
   <!-- Three.js r154 Code -->
@@ -570,7 +571,7 @@
           50*n
         );
       }
-      update(deltaTime, time){}
+      update(deltaTime, time){ }
     }
 
     // Fractal & Ridged Noise
@@ -603,7 +604,7 @@
           50 * noiseValue
         );
       }
-      update(deltaTime, time) {}
+      update(deltaTime, time) { }
     }
 
     class RidgedNoiseEquation extends EquationBase {
@@ -624,7 +625,7 @@
           50 * ridged
         );
       }
-      update(deltaTime, time) {}
+      update(deltaTime, time) { }
     }
 
     /************************************
@@ -1270,9 +1271,32 @@
           }
         });
         const eqContainer = document.getElementById('eqModules');
+        // Mapping for module header background colors based on desired dark gray level:
+        const colorMap = {
+          "rossler": "#2b2b2b",
+          "roseCurve": "#3c3c3c",
+          "spiral": "#3c3c3c",
+          "torus": "#3c3c3c",
+          "fourierSeries": "#3c3c3c",
+          "lissajous": "#3c3c3c",
+          "sineDistortion": "#4d4d4d",
+          "reactionDiffusion": "#4d4d4d",
+          "phaseRipple": "#4d4d4d",
+          "zSineWarp": "#4d4d4d",
+          "radialTwist": "#4d4d4d",
+          "lorenz": "#4d4d4d",
+          "shm": "#4d4d4d",
+          "noiseEq": "#5e5e5e",
+          "fractalNoise": "#5e5e5e",
+          "ridgedNoise": "#5e5e5e"
+        };
         this.eqModules.forEach(mod=>{
           const header = document.createElement('div');
           header.className = 'moduleHeader';
+          // Set header background based on mapping
+          if(colorMap[mod.id]){
+            header.style.background = colorMap[mod.id];
+          }
           const titleSpan = document.createElement('span');
           titleSpan.textContent = mod.name;
           header.appendChild(titleSpan);
@@ -1751,42 +1775,40 @@
         this.zSineWarp     = new ZSineWarpEquation();
         this.radialTwist   = new RadialTwistEquation();
 
+        // Defaults at first start
+        this.lissajous.enabled = false;
+        this.spiral.enabled = false;
+        this.fourierSeries.enabled = false;
+        this.shm.enabled = false;
+        this.lorenz.enabled = false;
+        this.reactionDiffusion.enabled = false;
+        this.noiseEq.enabled = false;
+        this.fractalNoise.enabled = false;
+        this.torusEq.enabled = false;
+        this.rossler.enabled = false;
+        this.sineDistortion.enabled = false;
+        this.phaseRipple.enabled = false;
+        this.zSineWarp.enabled = false;
+        this.radialTwist.enabled = false;
 
-// Defaults at first start
-this.lissajous.enabled = false;
-this.spiral.enabled = false;
-this.fourierSeries.enabled = false;
-this.shm.enabled = false;
-this.lorenz.enabled = false;
-this.reactionDiffusion.enabled = false;
-this.noiseEq.enabled = false;
-this.fractalNoise.enabled = false;
-this.torusEq.enabled = false;
-this.rossler.enabled = false;
-this.sineDistortion.enabled = false;
-this.phaseRipple.enabled = false;
-this.zSineWarp.enabled = false;
-this.radialTwist.enabled = false;
-
-
-
+        // Reordered eqModules array per the requested order and renaming:
         this.eqModules = [
-          { id: "lissajous",        name: "Lissajous Equation",     instance: this.lissajous },
+          { id: "rossler",          name: "Rossler Jitter",         instance: this.rossler },
           { id: "roseCurve",        name: "Rose Curve",             instance: this.roseCurve },
-          { id: "spiral",           name: "Spiral Equation",        instance: this.spiral },
+          { id: "spiral",           name: "Spiral Curve",           instance: this.spiral },
+          { id: "torus",            name: "Torus",                  instance: this.torusEq },
           { id: "fourierSeries",    name: "Fourier Series",         instance: this.fourierSeries },
-          { id: "shm",              name: "Simple Harmonic Motion", instance: this.shm },
-          { id: "lorenz",           name: "Lorenz Attractor",       instance: this.lorenz },
-          { id: "reactionDiffusion",name: "Reaction-Diffusion",     instance: this.reactionDiffusion },
-          { id: "noiseEq",          name: "Simplex Noise",          instance: this.noiseEq },
-          { id: "fractalNoise",     name: "Fractal Noise",          instance: this.fractalNoise },
-          { id: "ridgedNoise",      name: "Ridged Noise",           instance: this.ridgedNoise },
-          { id: "torus",            name: "Torus Equation",         instance: this.torusEq },
-          { id: "rossler",          name: "Rossler Attractor",      instance: this.rossler },
+          { id: "lissajous",        name: "Lissajous",              instance: this.lissajous },
           { id: "sineDistortion",   name: "Sine Distortion",        instance: this.sineDistortion },
+          { id: "reactionDiffusion",name: "Reaction-Diffusion",     instance: this.reactionDiffusion },
           { id: "phaseRipple",      name: "Phase Ripple",           instance: this.phaseRipple },
           { id: "zSineWarp",        name: "Z-Sine Warp",            instance: this.zSineWarp },
-          { id: "radialTwist",      name: "Radial Twist",           instance: this.radialTwist }
+          { id: "radialTwist",      name: "Radial Twist",           instance: this.radialTwist },
+          { id: "lorenz",           name: "Lorenz Attractor",      instance: this.lorenz },
+          { id: "shm",              name: "Simple Harmonic Motion", instance: this.shm },
+          { id: "noiseEq",          name: "Simplex Noise",          instance: this.noiseEq },
+          { id: "fractalNoise",     name: "Fractal Noise",          instance: this.fractalNoise },
+          { id: "ridgedNoise",      name: "Ridged Noise",           instance: this.ridgedNoise }
         ];
         this.integrationModule = new IntegrationModule(this.scene, this.eqModules);
         this.soundModule = new SoundModule();
@@ -2148,9 +2170,6 @@ this.radialTwist.enabled = false;
     event.target.value = "";
   });
 </script>
-
-
-
 
 </body>
 </html>
