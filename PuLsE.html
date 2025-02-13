@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>PuLsE v.9</title>
+  <title>PuLsE v.11</title>
   <!-- Three.js r154 Import Map -->
   <script type="importmap">
   {
@@ -270,7 +270,7 @@
       <!-- Jitter Modulation Controls -->
       <div class="controlElement">
         <label>
-          <input type="checkbox" id="soundJitterEnable" checked> Jitter (*enable Rossler)
+          <input type="checkbox" id="soundJitterEnable" checked> Jitter (*enables Rossler)
         </label>
       </div>
       <div class="controlElement">
@@ -297,7 +297,23 @@
     </div>
 
     <!-- Equation Modules Container -->
-    <div id="eqModules"></div>
+    
+
+<!-- Equation Categories Container -->
+<div id="eqModules">
+  <div id="pathsCategory">
+    <div class="moduleHeader" data-target="pathsContent">Paths</div>
+    <div id="pathsContent" class="moduleContent"></div>
+  </div>
+  <div id="distortionsCategory">
+    <div class="moduleHeader" data-target="distortionsContent">Distortions</div>
+    <div id="distortionsContent" class="moduleContent"></div>
+  </div>
+  <div id="noisesCategory">
+    <div class="moduleHeader" data-target="noisesContent">Noises</div>
+    <div id="noisesContent" class="moduleContent"></div>
+  </div>
+</div>
 
   </div>
 
@@ -778,6 +794,102 @@
       }
     }
 
+    // ------------------ New 3D Parametric Equations ------------------
+    class EpicycloidEquation extends EquationBase {
+      constructor(){
+        super();
+        this.R = 80;       // Fixed circle radius
+        this.r = 30;       // Rolling circle radius
+        this.zAmplitude = 20;
+        this.zFrequency = 1.0;
+        this.t = 0;
+      }
+      getContribution(index, totalPoints, time) {
+        this.t = time * this.speed;
+        const tVal = this.t + (index/totalPoints)*Math.PI*2;
+        const x = (this.R + this.r)*Math.cos(tVal) - this.r*Math.cos(((this.R + this.r)/this.r)*tVal);
+        const y = (this.R + this.r)*Math.sin(tVal) - this.r*Math.sin(((this.R + this.r)/this.r)*tVal);
+        const z = this.zAmplitude * Math.sin(this.zFrequency * tVal);
+        return new THREE.Vector3(x, y, z);
+      }
+    }
+
+    class HypocycloidEquation extends EquationBase {
+      constructor(){
+        super();
+        this.R = 80;
+        this.r = 30;
+        this.zAmplitude = 20;
+        this.zFrequency = 1.0;
+        this.t = 0;
+      }
+      getContribution(index, totalPoints, time) {
+        this.t = time * this.speed;
+        const tVal = this.t + (index/totalPoints)*Math.PI*2;
+        const x = (this.R - this.r)*Math.cos(tVal) + this.r*Math.cos(((this.R - this.r)/this.r)*tVal);
+        const y = (this.R - this.r)*Math.sin(tVal) - this.r*Math.sin(((this.R - this.r)/this.r)*tVal);
+        const z = this.zAmplitude * Math.sin(this.zFrequency * tVal);
+        return new THREE.Vector3(x, y, z);
+      }
+    }
+
+    class CardioidEquation extends EquationBase {
+      constructor(){
+        super();
+        this.a = 80;       // Scale factor for the cardioid
+        this.zAmplitude = 20;
+        this.zFrequency = 1.0;
+        this.t = 0;
+      }
+      getContribution(index, totalPoints, time) {
+        this.t = time * this.speed;
+        const theta = this.t + (index/totalPoints)*Math.PI*2;
+        const r = this.a * (1 + Math.cos(theta));
+        const x = r * Math.cos(theta);
+        const y = r * Math.sin(theta);
+        const z = this.zAmplitude * Math.sin(this.zFrequency * theta);
+        return new THREE.Vector3(x, y, z);
+      }
+    }
+
+    class LemniscateEquation extends EquationBase {
+      constructor(){
+        super();
+        this.a = 80;       // Scale factor for the lemniscate
+        this.zAmplitude = 20;
+        this.zFrequency = 1.0;
+        this.t = 0;
+      }
+      getContribution(index, totalPoints, time) {
+        this.t = time * this.speed;
+        const theta = this.t + (index/totalPoints)*Math.PI*2;
+        const denominator = 1 + Math.pow(Math.sin(theta), 2);
+        const x = this.a * Math.cos(theta) / denominator;
+        const y = this.a * Math.sin(theta) * Math.cos(theta) / denominator;
+        const z = this.zAmplitude * Math.cos(this.zFrequency * theta);
+        return new THREE.Vector3(x, y, z);
+      }
+    }
+
+    class ButterflyEquation extends EquationBase {
+      constructor(){
+        super();
+        this.scale = 40;   // Overall scale for the butterfly shape
+        this.zAmplitude = 20;
+        this.zFrequency = 1.0;
+        this.t = 0;
+      }
+      getContribution(index, totalPoints, time) {
+        this.t = time * this.speed;
+        const tVal = this.t + (index/totalPoints)*Math.PI*2;
+        const common = Math.exp(Math.cos(tVal)) - 2*Math.cos(4*tVal) - Math.pow(Math.sin(tVal/12), 5);
+        const x = this.scale * Math.sin(tVal) * common;
+        const y = this.scale * Math.cos(tVal) * common;
+        const z = this.zAmplitude * Math.sin(this.zFrequency * tVal);
+        return new THREE.Vector3(x, y, z);
+      }
+    }
+
     /**************** IntegrationModule****************/
     class IntegrationModule {
       constructor(scene, eqModules){
@@ -1237,7 +1349,43 @@
         this.soundModule = soundModule;
         this.initPanel();
       }
+
+
       initPanel(){
+
+
+const categoryMap = {
+  // Paths (clear parametric paths)
+  "lissajous": "paths",
+  "roseCurve": "paths",
+  "spiral": "paths",
+  "fourierSeries": "paths",
+  "torus": "paths",
+  "epicycloid": "paths",
+  "hypocycloid": "paths",
+  "cardioid": "paths",
+  "lemniscate": "paths",
+  "butterfly": "paths",
+  
+  // Distortions (dynamic, chaotic, warped)
+  "sineDistortion": "distortions",
+  "reactionDiffusion": "distortions",
+  "phaseRipple": "distortions",
+  "zSineWarp": "distortions",
+  "radialTwist": "distortions",
+  "lorenz": "distortions",
+  "shm": "distortions",
+  "rossler": "distortions",
+  
+  
+  // Noises (noise‐based equations)
+  "noiseEq": "noises",
+  "fractalNoise": "noises",
+  "ridgedNoise": "noises"
+};
+        
+
+
         document.getElementById('globalPointCount').addEventListener('input', (e)=>{
           const count = parseInt(e.target.value);
           this.eqModules.forEach(mod=>{
@@ -1279,6 +1427,14 @@
           "torus": "#3c3c3c",
           "fourierSeries": "#3c3c3c",
           "lissajous": "#3c3c3c",
+
+"epicycloid": "#3c3c3c",
+"hypocycloid": "#3c3c3c",
+"cardioid": "#3c3c3c",
+"lemniscate": "#3c3c3c",
+"butterfly": "#3c3c3c",
+
+
           "sineDistortion": "#4d4d4d",
           "reactionDiffusion": "#4d4d4d",
           "phaseRipple": "#4d4d4d",
@@ -1553,10 +1709,122 @@
                 </div>
               `;
               break;
+
+case "epicycloid":
+  innerHTML += `
+    <div class="controlElement">
+      <label>Fixed Radius (R):
+        <input type="range" id="${mod.id}_R" min="10" max="150" step="0.1" value="${mod.instance.R}">
+      </label>
+    </div>
+    <div class="controlElement">
+      <label>Rolling Radius (r):
+        <input type="range" id="${mod.id}_r" min="5" max="100" step="0.1" value="${mod.instance.r}">
+      </label>
+    </div>
+    <div class="controlElement">
+      <label>Z Amplitude:
+        <input type="range" id="${mod.id}_zAmplitude" min="0" max="50" step="0.1" value="${mod.instance.zAmplitude}">
+      </label>
+    </div>
+    <div class="controlElement">
+      <label>Z Frequency:
+        <input type="range" id="${mod.id}_zFrequency" min="0.1" max="5" step="0.1" value="${mod.instance.zFrequency}">
+      </label>
+    </div>
+  `;
+  break;
+case "hypocycloid":
+  innerHTML += `
+    <div class="controlElement">
+      <label>Fixed Radius (R):
+        <input type="range" id="${mod.id}_R" min="10" max="150" step="0.1" value="${mod.instance.R}">
+      </label>
+    </div>
+    <div class="controlElement">
+      <label>Rolling Radius (r):
+        <input type="range" id="${mod.id}_r" min="5" max="100" step="0.1" value="${mod.instance.r}">
+      </label>
+    </div>
+    <div class="controlElement">
+      <label>Z Amplitude:
+        <input type="range" id="${mod.id}_zAmplitude" min="0" max="50" step="0.1" value="${mod.instance.zAmplitude}">
+      </label>
+    </div>
+    <div class="controlElement">
+      <label>Z Frequency:
+        <input type="range" id="${mod.id}_zFrequency" min="0.1" max="5" step="0.1" value="${mod.instance.zFrequency}">
+      </label>
+    </div>
+  `;
+  break;
+case "cardioid":
+  innerHTML += `
+    <div class="controlElement">
+      <label>Scale Factor (a):
+        <input type="range" id="${mod.id}_a" min="10" max="150" step="0.1" value="${mod.instance.a}">
+      </label>
+    </div>
+    <div class="controlElement">
+      <label>Z Amplitude:
+        <input type="range" id="${mod.id}_zAmplitude" min="0" max="50" step="0.1" value="${mod.instance.zAmplitude}">
+      </label>
+    </div>
+    <div class="controlElement">
+      <label>Z Frequency:
+        <input type="range" id="${mod.id}_zFrequency" min="0.1" max="5" step="0.1" value="${mod.instance.zFrequency}">
+      </label>
+    </div>
+  `;
+  break;
+case "lemniscate":
+  innerHTML += `
+    <div class="controlElement">
+      <label>Scale Factor (a):
+        <input type="range" id="${mod.id}_a" min="10" max="150" step="0.1" value="${mod.instance.a}">
+      </label>
+    </div>
+    <div class="controlElement">
+      <label>Z Amplitude:
+        <input type="range" id="${mod.id}_zAmplitude" min="0" max="50" step="0.1" value="${mod.instance.zAmplitude}">
+      </label>
+    </div>
+    <div class="controlElement">
+      <label>Z Frequency:
+        <input type="range" id="${mod.id}_zFrequency" min="0.1" max="5" step="0.1" value="${mod.instance.zFrequency}">
+      </label>
+    </div>
+  `;
+  break;
+case "butterfly":
+  innerHTML += `
+    <div class="controlElement">
+      <label>Scale:
+        <input type="range" id="${mod.id}_scale" min="10" max="100" step="0.1" value="${mod.instance.scale}">
+      </label>
+    </div>
+    <div class="controlElement">
+      <label>Z Amplitude:
+        <input type="range" id="${mod.id}_zAmplitude" min="0" max="50" step="0.1" value="${mod.instance.zAmplitude}">
+      </label>
+    </div>
+    <div class="controlElement">
+      <label>Z Frequency:
+        <input type="range" id="${mod.id}_zFrequency" min="0.1" max="5" step="0.1" value="${mod.instance.zFrequency}">
+      </label>
+    </div>
+  `;
+  break;
           }
           content.innerHTML = innerHTML;
-          eqContainer.appendChild(header);
-          eqContainer.appendChild(content);
+          // eqContainer.appendChild(header);
+          // eqContainer.appendChild(content);
+
+
+const containerId = categoryMap[mod.id] + "Content";
+document.getElementById(containerId).appendChild(header);
+document.getElementById(containerId).appendChild(content);
+          
           const speedInput = content.querySelector(`#${mod.id}_speed`);
           if(speedInput){
             speedInput.addEventListener('input', (e) => { 
@@ -1660,6 +1928,36 @@
             content.querySelector(`#${mod.id}_zWaveFrequency`).addEventListener('input', (e) => { mod.instance.zWaveFrequency = parseFloat(e.target.value); saveSettings(); });
             content.querySelector(`#${mod.id}_zWaveAmplitude`).addEventListener('input', (e) => { mod.instance.zWaveAmplitude = parseFloat(e.target.value); saveSettings(); });
           }
+
+
+else if(mod.id === "epicycloid"){
+  content.querySelector(`#${mod.id}_R`).addEventListener('input', (e) => { mod.instance.R = parseFloat(e.target.value); saveSettings(); });
+  content.querySelector(`#${mod.id}_r`).addEventListener('input', (e) => { mod.instance.r = parseFloat(e.target.value); saveSettings(); });
+  content.querySelector(`#${mod.id}_zAmplitude`).addEventListener('input', (e) => { mod.instance.zAmplitude = parseFloat(e.target.value); saveSettings(); });
+  content.querySelector(`#${mod.id}_zFrequency`).addEventListener('input', (e) => { mod.instance.zFrequency = parseFloat(e.target.value); saveSettings(); });
+} else if(mod.id === "hypocycloid"){
+  content.querySelector(`#${mod.id}_R`).addEventListener('input', (e) => { mod.instance.R = parseFloat(e.target.value); saveSettings(); });
+  content.querySelector(`#${mod.id}_r`).addEventListener('input', (e) => { mod.instance.r = parseFloat(e.target.value); saveSettings(); });
+  content.querySelector(`#${mod.id}_zAmplitude`).addEventListener('input', (e) => { mod.instance.zAmplitude = parseFloat(e.target.value); saveSettings(); });
+  content.querySelector(`#${mod.id}_zFrequency`).addEventListener('input', (e) => { mod.instance.zFrequency = parseFloat(e.target.value); saveSettings(); });
+} else if(mod.id === "cardioid"){
+  content.querySelector(`#${mod.id}_a`).addEventListener('input', (e) => { mod.instance.a = parseFloat(e.target.value); saveSettings(); });
+  content.querySelector(`#${mod.id}_zAmplitude`).addEventListener('input', (e) => { mod.instance.zAmplitude = parseFloat(e.target.value); saveSettings(); });
+  content.querySelector(`#${mod.id}_zFrequency`).addEventListener('input', (e) => { mod.instance.zFrequency = parseFloat(e.target.value); saveSettings(); });
+} else if(mod.id === "lemniscate"){
+  content.querySelector(`#${mod.id}_a`).addEventListener('input', (e) => { mod.instance.a = parseFloat(e.target.value); saveSettings(); });
+  content.querySelector(`#${mod.id}_zAmplitude`).addEventListener('input', (e) => { mod.instance.zAmplitude = parseFloat(e.target.value); saveSettings(); });
+  content.querySelector(`#${mod.id}_zFrequency`).addEventListener('input', (e) => { mod.instance.zFrequency = parseFloat(e.target.value); saveSettings(); });
+} else if(mod.id === "butterfly"){
+  content.querySelector(`#${mod.id}_scale`).addEventListener('input', (e) => { mod.instance.scale = parseFloat(e.target.value); saveSettings(); });
+  content.querySelector(`#${mod.id}_zAmplitude`).addEventListener('input', (e) => { mod.instance.zAmplitude = parseFloat(e.target.value); saveSettings(); });
+  content.querySelector(`#${mod.id}_zFrequency`).addEventListener('input', (e) => { mod.instance.zFrequency = parseFloat(e.target.value); saveSettings(); });
+}
+
+
+
+
+
           header.addEventListener('click', function(e){
             if(e.target !== enableCheckbox){
               content.style.display = (content.style.display==='block') ? 'none' : 'block';
@@ -1685,6 +1983,24 @@
             soundContent.style.display = (soundContent.style.display==='block') ? 'none' : 'block';
           });
         });
+
+
+document.getElementById('soundJitterEnable').addEventListener('change', function(e) {
+  if (e.target.checked) {
+    // Automatically enable the Rossler equation.
+    if (window.visualization && window.visualization.rossler) {
+      window.visualization.rossler.enabled = true;
+    }
+    // Optionally update the Rossler control panel checkbox, if it exists.
+    const rosslerCheckbox = document.getElementById('rossler_enable');
+    if (rosslerCheckbox) {
+      rosslerCheckbox.checked = true;
+    }
+  }
+});
+
+
+
         const glowCheckbox = document.getElementById('useGlowPoints');
         const glowPointsHeader = document.getElementById('glowPointsHeader');
         const glowPointsSettings = document.getElementById('glowPointsSettings');
@@ -1775,6 +2091,12 @@
         this.zSineWarp     = new ZSineWarpEquation();
         this.radialTwist   = new RadialTwistEquation();
 
+this.epicycloid = new EpicycloidEquation();
+this.hypocycloid = new HypocycloidEquation();
+this.cardioid = new CardioidEquation();
+this.lemniscate = new LemniscateEquation();
+this.butterfly = new ButterflyEquation();
+
         // Defaults at first start
         this.lissajous.enabled = false;
         this.spiral.enabled = false;
@@ -1791,6 +2113,12 @@
         this.zSineWarp.enabled = false;
         this.radialTwist.enabled = false;
 
+this.epicycloid.enabled = false;
+this.hypocycloid.enabled = false;
+this.cardioid.enabled = false;
+this.lemniscate.enabled = false;
+this.butterfly.enabled = false;
+
         // Reordered eqModules array per the requested order and renaming:
         this.eqModules = [
           { id: "rossler",          name: "Rossler Jitter",         instance: this.rossler },
@@ -1799,6 +2127,13 @@
           { id: "torus",            name: "Torus",                  instance: this.torusEq },
           { id: "fourierSeries",    name: "Fourier Series",         instance: this.fourierSeries },
           { id: "lissajous",        name: "Lissajous",              instance: this.lissajous },
+
+  { id: "epicycloid",       name: "Epicycloid",             instance: this.epicycloid },
+  { id: "hypocycloid",      name: "Hypocycloid",            instance: this.hypocycloid },
+  { id: "cardioid",         name: "Cardioid",               instance: this.cardioid },
+  { id: "lemniscate",       name: "Lemniscate",             instance: this.lemniscate },
+  { id: "butterfly",        name: "Butterfly",              instance: this.butterfly },
+
           { id: "sineDistortion",   name: "Sine Distortion",        instance: this.sineDistortion },
           { id: "reactionDiffusion",name: "Reaction-Diffusion",     instance: this.reactionDiffusion },
           { id: "phaseRipple",      name: "Phase Ripple",           instance: this.phaseRipple },
@@ -1875,6 +2210,47 @@
       window.visualization = viz;
       new ControlPanel(viz.eqModules, viz.soundModule);
       loadSettings();
+
+
+  const syncJitterAndRossler = () => {
+    const jitterCheckbox = document.getElementById('soundJitterEnable');
+    if (jitterCheckbox && jitterCheckbox.checked) {
+      if (window.visualization && window.visualization.rossler && !window.visualization.rossler.enabled) {
+        window.visualization.rossler.enabled = true;
+        // Optionally update the Rossler control panel checkbox, if present:
+        const rosslerCheckbox = document.getElementById('rossler_enable');
+        if (rosslerCheckbox) {
+          rosslerCheckbox.checked = true;
+        }
+      }
+    }
+  };
+
+  // Run the check immediately on page load
+  syncJitterAndRossler();
+  // And update whenever the Jitter checkbox changes
+  document.getElementById('soundJitterEnable').addEventListener('change', syncJitterAndRossler);
+
+  // --- Begin: Show control panel for 3 seconds ---
+  const controlPanel = document.getElementById('controlPanel');
+  // Force the control panel to show immediately
+  controlPanel.style.transform = "translateX(0)";
+  controlPanel.style.opacity = "1";
+  // After 3 seconds, hide it again
+setTimeout(() => {
+  controlPanel.style.removeProperty('transform');
+  controlPanel.style.removeProperty('opacity');
+}, 3000);
+
+  // --- End: Show control panel for 3 seconds ---
+
+
+// Immediately enable the sound module on start
+viz.soundModule.init();
+document.getElementById('startAudio').disabled = true;
+
+
+
     });
 
     document.body.classList.add('hide-cursor');
@@ -2099,8 +2475,6 @@
     }
   </script>
 
-
-
 <!-- New Script: Export/Import Favorites -->
 <script>
   // Export Favorites: Save the favorites from localStorage to a JSON file.
@@ -2169,6 +2543,19 @@
     // Reset the file input so the same file can be re-imported if needed.
     event.target.value = "";
   });
+</script>
+
+
+<!-- New Script: Attach data-target event listeners to category roll-down headers -->
+<script> 
+// Now only attach the toggle handler to the category headers within #eqModules.
+document.querySelectorAll('#eqModules > div > .moduleHeader[data-target]').forEach(header => {
+  header.addEventListener('click', function(){
+    const targetId = header.getAttribute('data-target');
+    const contentDiv = document.getElementById(targetId);
+    contentDiv.style.display = (contentDiv.style.display === 'block') ? 'none' : 'block';
+  });
+});
 </script>
 
 </body>
