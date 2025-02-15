@@ -378,6 +378,9 @@
       }
       setPointCount(n){ this.pointCount = n; }
       calculateColorPalette(baseHex){ return [baseHex]; }
+      // ADDED: Serialization methods for internal state
+      serializeState() { return {}; }
+      deserializeState(state) { }
     }
 
     class LissajousEquation extends EquationBase {
@@ -502,6 +505,17 @@
         this.z += dz*dt;
         return new THREE.Vector3(this.x, this.y, this.z);
       }
+      // ADDED: Save and restore internal state for Lorenz
+      serializeState() {
+        return { x: this.x, y: this.y, z: this.z };
+      }
+      deserializeState(state) {
+        if(state){
+          this.x = state.x;
+          this.y = state.y;
+          this.z = state.z;
+        }
+      }
     }
 
     class ReactionDiffusionEquation extends EquationBase {
@@ -557,6 +571,16 @@
         }
         this.u = newU; 
         this.v = newV;
+      }
+      // ADDED: Serialization for Reaction-Diffusion state
+      serializeState() {
+        return { u: this.u, v: this.v };
+      }
+      deserializeState(state) {
+        if(state && state.u && state.v){
+          this.u = state.u;
+          this.v = state.v;
+        }
       }
     }
 
@@ -791,6 +815,17 @@
           jitterY + Math.sin(phase)*(this.jitterFactor*0.1),
           jitterZ
         );
+      }
+      // ADDED: Serialization for Rossler internal state
+      serializeState() {
+        return { x: this.x, y: this.y, z: this.z };
+      }
+      deserializeState(state) {
+        if(state){
+          this.x = state.x;
+          this.y = state.y;
+          this.z = state.z;
+        }
       }
     }
 
@@ -1190,36 +1225,7 @@
     // Expose saveSettings globally for non-module scripts
     window.saveSettings = saveSettings;
 
-    function loadSettings(){
-      const settingsStr = localStorage.getItem('visualizationSettings');
-      if(settingsStr){
-        const settings = JSON.parse(settingsStr);
-        for(const id in settings){
-          if(id==="camera") continue;
-          if(id==="fullscreenToggle") continue;
-          const element = document.getElementById(id);
-          if(element){
-            if(element.type==="checkbox"){
-              element.checked = settings[id];
-              element.dispatchEvent(new Event('change'));
-            } else {
-              element.value = settings[id];
-              element.dispatchEvent(new Event('input'));
-            }
-          }
-        }
-        if(settings.camera && window.visualization){
-          const cam = settings.camera;
-          window.visualization.camera.position.set(cam.position.x, cam.position.y, cam.position.z);
-          window.visualization.camera.zoom = cam.zoom;
-          window.visualization.camera.updateProjectionMatrix();
-          window.visualization.controls.target.set(cam.controlsTarget.x, cam.controlsTarget.y, cam.controlsTarget.z);
-          window.visualization.controls.update();
-        }
-      }
-    }
-
-    // Modified saveFavorite() to skip slideshow controls
+    // ADDED: Modified saveFavorite() to also save each equation’s internal state.
     function saveFavorite(){
       const fav = {};
       document.querySelectorAll('#controlPanel input').forEach(input=>{
@@ -1245,6 +1251,13 @@
             z: window.visualization.controls.target.z
           }
         };
+      }
+      // ADDED: Save internal state for each equation.
+      if(window.visualization && window.visualization.eqModules) {
+        fav.equations = {};
+        window.visualization.eqModules.forEach(mod => {
+          fav.equations[mod.id] = mod.instance.serializeState();
+        });
       }
       let favorites = JSON.parse(localStorage.getItem('favoriteSettings') || '[]');
       favorites.push(fav);
@@ -1286,6 +1299,14 @@
               window.visualization.controls.target.set(cam.controlsTarget.x, cam.controlsTarget.y, cam.controlsTarget.z);
               window.visualization.controls.update();
             }
+            // ADDED: Restore internal state for each equation.
+            if(window.visualization && window.visualization.eqModules && fav.equations){
+              window.visualization.eqModules.forEach(mod => {
+                if(fav.equations[mod.id] !== undefined){
+                  mod.instance.deserializeState(fav.equations[mod.id]);
+                }
+              });
+            }
             saveSettings();
             document.body.style.opacity = "1";
           },500);
@@ -1310,7 +1331,7 @@
       updateFavoriteList();
     }
 
-    // Modified loadFavoriteForSlideshow() to skip loading slideshow controls
+    // ADDED: Modified loadFavoriteForSlideshow() to also restore internal state.
     function loadFavoriteForSlideshow(fav) {
       document.body.style.transition = "opacity 0.5s ease";
       document.body.style.opacity = "0";
@@ -1336,6 +1357,14 @@
           window.visualization.camera.updateProjectionMatrix();
           window.visualization.controls.target.set(cam.controlsTarget.x, cam.controlsTarget.y, cam.controlsTarget.z);
           window.visualization.controls.update();
+        }
+        // ADDED: Restore internal state for each equation.
+        if(window.visualization && window.visualization.eqModules && fav.equations){
+          window.visualization.eqModules.forEach(mod => {
+            if(fav.equations[mod.id] !== undefined){
+              mod.instance.deserializeState(fav.equations[mod.id]);
+            }
+          });
         }
         saveSettings();
         document.body.style.opacity = "1";
@@ -1376,7 +1405,6 @@ const categoryMap = {
   "lorenz": "distortions",
   "shm": "distortions",
   "rossler": "distortions",
-  
   
   // Noises (noise‐based equations)
   "noiseEq": "noises",
@@ -1954,10 +1982,6 @@ else if(mod.id === "epicycloid"){
   content.querySelector(`#${mod.id}_zFrequency`).addEventListener('input', (e) => { mod.instance.zFrequency = parseFloat(e.target.value); saveSettings(); });
 }
 
-
-
-
-
           header.addEventListener('click', function(e){
             if(e.target !== enableCheckbox){
               content.style.display = (content.style.display==='block') ? 'none' : 'block';
@@ -1998,7 +2022,7 @@ document.getElementById('soundJitterEnable').addEventListener('change', function
     }
   }
 });
-
+        
 
 
         const glowCheckbox = document.getElementById('useGlowPoints');
@@ -2212,6 +2236,41 @@ this.butterfly.enabled = false;
       loadSettings();
 
 
+
+
+    function loadSettings(){
+      const settingsStr = localStorage.getItem('visualizationSettings');
+      if(settingsStr){
+        const settings = JSON.parse(settingsStr);
+        for(const id in settings){
+          if(id==="camera") continue;
+          if(id==="fullscreenToggle") continue;
+          const element = document.getElementById(id);
+          if(element){
+            if(element.type==="checkbox"){
+              element.checked = settings[id];
+              element.dispatchEvent(new Event('change'));
+            } else {
+              element.value = settings[id];
+              element.dispatchEvent(new Event('input'));
+            }
+          }
+        }
+        if(settings.camera && window.visualization){
+          const cam = settings.camera;
+          window.visualization.camera.position.set(cam.position.x, cam.position.y, cam.position.z);
+          window.visualization.camera.zoom = cam.zoom;
+          window.visualization.camera.updateProjectionMatrix();
+          window.visualization.controls.target.set(cam.controlsTarget.x, cam.controlsTarget.y, cam.controlsTarget.z);
+          window.visualization.controls.update();
+        }
+      }
+    }
+
+
+
+
+
   const syncJitterAndRossler = () => {
     const jitterCheckbox = document.getElementById('soundJitterEnable');
     if (jitterCheckbox && jitterCheckbox.checked) {
@@ -2245,9 +2304,9 @@ setTimeout(() => {
   // --- End: Show control panel for 3 seconds ---
 
 
-// Immediately enable the sound module on start
-viz.soundModule.init();
-document.getElementById('startAudio').disabled = true;
+  // Immediately enable the sound module on start
+  viz.soundModule.init();
+  document.getElementById('startAudio').disabled = true;
 
 
 
@@ -2357,6 +2416,14 @@ document.getElementById('startAudio').disabled = true;
             window.visualization.camera.updateProjectionMatrix();
             window.visualization.controls.target.set(cam.controlsTarget.x, cam.controlsTarget.y, cam.controlsTarget.z);
             window.visualization.controls.update();
+          }
+          // ADDED: Restore internal state for each equation.
+          if(window.visualization && window.visualization.eqModules && fav.equations){
+            window.visualization.eqModules.forEach(mod => {
+              if(fav.equations[mod.id] !== undefined){
+                mod.instance.deserializeState(fav.equations[mod.id]);
+              }
+            });
           }
           saveSettings();
           document.body.style.opacity = "1";
