@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dune Series</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 20px;
+            background: linear-gradient(135deg, #0d1b2a 0%, #1a1a1a 100%);
+            color: #e0e0e0;
+            position: relative;
+            min-height: 100vh;
+            overflow-x: auto;
+        }
+        /* Starfield Container */
+        .starfield {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -2;
+            pointer-events: none;
+        }
+        /* Near Stars */
+        .starfield::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 200%;
+            height: 100%;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><rect width="100%" height="100%" fill="transparent"/><g class="stars-near"><circle cx="2%" cy="5%" r="3" fill="%23ffffff" opacity="0.9"/><circle cx="8%" cy="15%" r="2" fill="%23add8e6" opacity="0.8"/><circle cx="14%" cy="25%" r="1" fill="%23ffff99" opacity="0.7"/><circle cx="20%" cy="10%" r="2" fill="%23ff9999" opacity="0.6"/><circle cx="26%" cy="20%" r="3" fill="%23ffffff" opacity="0.9"/><circle cx="32%" cy="30%" r="1" fill="%23add8e6" opacity="0.8"/><circle cx="38%" cy="8%" r="2" fill="%23ffff99" opacity="0.7"/><circle cx="44%" cy="18%" r="3" fill="%23ff9999" opacity="0.6"/><circle cx="50%" cy="12%" r="1" fill="%23ffffff" opacity="0.9"/><circle cx="56%" cy="22%" r="2" fill="%23add8e6" opacity="0.8"/><circle cx="62%" cy="28%" r="3" fill="%23ffff99" opacity="0.7"/><circle cx="68%" cy="15%" r="1" fill="%23ff9999" opacity="0.6"/><circle cx="74%" cy="25%" r="2" fill="%23ffffff" opacity="0.9"/><circle cx="80%" cy="5%" r="3" fill="%23add8e6" opacity="0.8"/><circle cx="86%" cy="20%" r="1" fill="%23ffff99" opacity="0.7"/><circle cx="92%" cy="10%" r="2" fill="%23ff9999" opacity="0.6"/></g></svg>') repeat-y;
+            background-size: 50% auto;
+            transform: perspective(500px) translateZ(-50px);
+            animation: starDriftNear 30s infinite linear, starTwinkleNear 3s infinite alternate;
+        }
+        /* Far Stars */
+        .starfield::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 200%;
+            height: 100%;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><rect width="100%" height="100%" fill="transparent"/><g class="stars-far"><circle cx="1%" cy="2%" r="1" fill="%23ffffff" opacity="0.5"/><circle cx="5%" cy="8%" r="0.5" fill="%23add8e6" opacity="0.4"/><circle cx="10%" cy="12%" r="1" fill="%23ffff99" opacity="0.3"/><circle cx="15%" cy="18%" r="0.8" fill="%23ff9999" opacity="0.4"/><circle cx="20%" cy="4%" r="1" fill="%23ffffff" opacity="0.5"/><circle cx="25%" cy="10%" r="0.5" fill="%23add8e6" opacity="0.4"/><circle cx="30%" cy="14%" r="1" fill="%23ffff99" opacity="0.3"/><circle cx="35%" cy="20%" r="0.8" fill="%23ff9999" opacity="0.4"/><circle cx="40%" cy="6%" r="1" fill="%23ffffff" opacity="0.5"/><circle cx="45%" cy="16%" r="0.5" fill="%23add8e6" opacity="0.4"/><circle cx="50%" cy="22%" r="1" fill="%23ffff99" opacity="0.3"/><circle cx="55%" cy="8%" r="0.8" fill="%23ff9999" opacity="0.4"/><circle cx="60%" cy="18%" r="1" fill="%23ffffff" opacity="0.5"/><circle cx="65%" cy="24%" r="0.5" fill="%23add8e6" opacity="0.4"/><circle cx="70%" cy="10%" r="1" fill="%23ffff99" opacity="0.3"/><circle cx="75%" cy="14%" r="0.8" fill="%23ff9999" opacity="0.4"/><circle cx="80%" cy="20%" r="1" fill="%23ffffff" opacity="0.5"/><circle cx="85%" cy="26%" r="0.5" fill="%23add8e6" opacity="0.4"/><circle cx="90%" cy="12%" r="1" fill="%23ffff99" opacity="0.3"/><circle cx="95%" cy="16%" r="0.8" fill="%23ff9999" opacity="0.4"/></g></svg>') repeat-y;
+            background-size: 50% auto;
+            transform: perspective(1000px) translateZ(-100px);
+            animation: starDriftFar 40s infinite linear, starTwinkleFar 4s infinite alternate;
+        }
+        /* Dune Layer */
+        .dunes {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 50%;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="%23ff8c00" fill-opacity="0.8" d="M0,224L48,213.3C96,203,192,181,288,170.7C384,160,480,160,576,154.7C672,149,768,139,864,144C960,149,1056,171,1152,181.3C1248,192,1344,192,1392,192L1440,192L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path><path fill="%23d4af37" fill-opacity="0.6" d="M0,256L48,245.3C96,235,192,213,288,202.7C384,192,480,192,576,186.7C672,181,768,171,864,176C960,181,1056,203,1152,213.3C1248,224,1344,224,1392,224L1440,224L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>') bottom no-repeat;
+            background-size: 100% 100%;
+            transform: perspective(1000px);
+            animation: duneShift 20s infinite ease-in-out;
+            z-index: -1;
+        }
+        @keyframes duneShift {
+            0%, 100% { transform: perspective(1000px) translateX(-20px) translateZ(-30px); }
+            50% { transform: perspective(1000px) translateX(20px) translateZ(-20px); }
+        }
+        @keyframes starDriftNear {
+            0% { transform: perspective(500px) translateX(0) translateZ(-50px); }
+            100% { transform: perspective(500px) translateX(-50px) translateZ(-50px); }
+        }
+        @keyframes starTwinkleNear {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+        @keyframes starDriftFar {
+            0% { transform: perspective(1000px) translateX(0) translateZ(-100px); }
+            100% { transform: perspective(1000px) translateX(-20px) translateZ(-100px); }
+        }
+        @keyframes starTwinkleFar {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.5; }
+        }
+        .stars-near circle, .stars-far circle {
+            animation: inherit;
+        }
+        .mind-map {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(30, 30, 30, 0.9);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+            position: relative;
+            z-index: 1;
+        }
+        .mind-map h1 {
+            color: #d4af37;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .mind-map ul {
+            list-style-type: none;
+            padding-left: 20px;
+        }
+        .mind-map summary {
+            cursor: pointer;
+            font-weight: bold;
+            color: #4682b4;
+            transition: color 0.3s;
+        }
+        .mind-map summary:hover {
+            color: #87ceeb;
+        }
+        .mind-map > ul > li > details > summary {
+            font-size: 18px;
+            color: #d4af37;
+        }
+        .mind-map ul ul > li > details > summary {
+            font-size: 14px;
+            color: #4682b4;
+        }
+        .mind-map p, .mind-map ul ul ul li {
+            font-size: 12px;
+            color: #e0e0e0;
+            line-height: 1.5;
+        }
+        .mind-map li {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="starfield"></div>
+    <div class="dunes"></div>
+    <div class="mind-map">
+        <h1>Dune Series (10,191 - 15,213 AG: After spacing Guild, which was the start of interstellar travel using Spice)</h1>
+        <ul id="novel-list"></ul>
+    </div>
+    <script>
+        class Novel {
+            constructor(title, setting, plot, timeline, characters, locations, themes, relationships) {
+                this.title = title;
+                this.setting = setting;
+                this.plot = plot;
+                this.timeline = timeline;
+                this.characters = characters;
+                this.locations = locations;
+                this.themes = themes;
+                this.relationships = relationships;
+            }
+
+            generateHTML() {
+                let html = `<li><details><summary>${this.title}</summary><ul>`;
+
+                html += `<li><details><summary>Setting</summary><p>${this.setting.description}</p><ul>`;
+                this.setting.planets.forEach(planet => {
+                    html += `<li><details><summary>${planet.name}</summary><p>${planet.description}</p></details></li>`;
+                });
+                html += `</ul></details></li>`;
+
+                html += `<li><details><summary>Plot</summary><ul>`;
+                this.plot.forEach(event => {
+                    html += `<li><details><summary>${event.summary}</summary><p>${event.details}</p></details></li>`;
+                });
+                html += `</ul></details></li>`;
+
+                html += `<li><details><summary>Timeline</summary><ul>`;
+                this.timeline.forEach(entry => {
+                    html += `<li><strong>${entry.date} AG</strong>: ${entry.event}</li>`;
+                });
+                html += `</ul></details></li>`;
+
+                html += `<li><details><summary>Locations</summary><ul>`;
+                this.locations.forEach(location => {
+                    html += `<li><details><summary>${location.name}</summary><p>${location.description}</p><ul>`;
+                    html += `<li>Events: <ul>`;
+                    location.events.forEach(event => html += `<li>${event}</li>`);
+                    html += `</ul></li>`;
+                    html += `<li>Characters: <ul>`;
+                    location.characters.forEach(character => html += `<li>${character}</li>`);
+                    html += `</ul></li>`;
+                    html += `</ul></details></li>`;
+                });
+                html += `</ul></details></li>`;
+
+                html += `<li><details><summary>Characters</summary><ul>`;
+                this.characters.forEach(character => {
+                    html += `<li><details><summary>${character.name}</summary><p>Role: ${character.role}</p><ul>`;
+                    html += `<li>Background: <p>${character.background}</p></li>`;
+                    html += `<li>Motivations: <p>${character.motivations}</p></li>`;
+                    html += `<li>Developments: <ul>`;
+                    character.developments.forEach(dev => html += `<li>${dev}</li>`);
+                    html += `</ul></li>`;
+                    html += `<li>Relationships: <ul>`;
+                    for (let relType in character.relationships) {
+                        html += `<li>${relType}: <ul>`;
+                        character.relationships[relType].forEach(rel => html += `<li>${rel}</li>`);
+                        html += `</ul></li>`;
+                    }
+                    html += `</ul></li>`;
+                    html += `</ul></details></li>`;
+                });
+                html += `</ul></details></li>`;
+
+                html += `<li><details><summary>Themes</summary><ul>`;
+                this.themes.forEach(theme => {
+                    html += `<li><details><summary>${theme.name}</summary><p>${theme.description}</p></details></li>`;
+                });
+                html += `</ul></details></li>`;
+
+                html += `<li><details><summary>Relationship to Other Novels</summary><p>${this.relationships}</p></details></li>`;
+
+                html += `</ul></details></li>`;
+                return html;
+            }
+        }
+
+
+
+
+
+
+const dune = new Novel(
+            "Dune",
+            {
+                description: "Set in a distant future, Dune unfolds in a feudal interstellar empire where noble houses govern planetary fiefs under the Padishah Emperor. Arrakis, a desert planet and the only source of the spice melange—a drug that enhances mental abilities, prolongs life, and enables space travel—anchors the story. The spice’s value drives political intrigue, economic stakes, and military conflicts among houses, the Emperor, and the Spacing Guild.",
+                planets: [
+                    { name: "Arrakis", description: "A harsh desert planet known as Dune, Arrakis features vast sand dunes, extreme heat, and scarce water. Home to the Fremen, a nomadic people, and giant sandworms that produce the spice melange, its cultural significance lies in its test of resilience, while its economic role as the spice source fuels galactic strife." },
+                    { name: "Caladan", description: "The lush, oceanic home of House Atreides, Caladan is a temperate world of forests and abundant water. Its mild climate reflects the Atreides’ noble heritage, serving as Paul’s birthplace and a symbol of their lost paradise." },
+                    { name: "Giedi Prime", description: "The polluted, industrial homeworld of House Harkonnen, Giedi Prime is a bleak planet of dark skies and factories. Its oppressive culture mirrors the Harkonnens’ cruelty, significant as the base for their schemes." },
+                    { name: "Kaitain", description: "The opulent capital of the Imperium, Kaitain boasts palaces and gardens, housing the Emperor’s court. Its significance lies in its role as the political heart, contrasting with Arrakis’ raw nature." }
+                ]
+            },
+            [
+                { summary: "House Atreides Moves to Arrakis", details: "Duke Leto Atreides relocates from Caladan to Arrakis under the Emperor’s orders, suspecting a trap due to the planet’s spice wealth. Hoping to ally with the Fremen, he’s unaware of a conspiracy with House Harkonnen, setting the stage for betrayal." },
+                { summary: "Betrayal and Attack", details: "Dr. Yueh betrays House Atreides, disabling defenses for a Harkonnen-Sardaukar assault on Arrakeen. Duke Leto dies attempting to kill Baron Harkonnen with a poison tooth, while Paul and Jessica escape into the desert, marking the Atreides’ fall." },
+                { summary: "Survival in the Desert", details: "Paul and Jessica find refuge with Stilgar’s Fremen tribe. Paul defeats Jamis in a duel, earning respect, while Jessica becomes a Reverend Mother via the spice agony, awakening Alia in utero. Paul’s visions hint at his messianic role." },
+                { summary: "Paul’s Rise as Muad’Dib", details: "Paul, as Muad’Dib, unites the Fremen with advanced combat skills. His prescient abilities as the Kwisatz Haderach grow, revealing a potential jihad, driving his mission to reclaim Arrakis." },
+                { summary: "The Revolution and Final Battle", details: "Paul disrupts spice production, luring the Emperor to Arrakis. Fremen riding sandworms defeat the Sardaukar, Paul kills Feyd-Rautha, and marries Irulan, securing power over the Imperium." }
+            ],
+            [
+                { date: "10,191", event: "House Atreides moves to Arrakis, beginning their rule over the desert planet." },
+                { date: "10,191", event: "Betrayal by Dr. Yueh leads to the Harkonnen-Sardaukar attack on Arrakeen." },
+                { date: "10,191", event: "Paul and Jessica escape into the desert and are taken in by the Fremen." },
+                { date: "10,191", event: "Paul undergoes the spice agony, awakening his prescient abilities as the Kwisatz Haderach." },
+                { date: "10,191", event: "Paul defeats Jamis in a ritual duel, earning the Fremen's respect." },
+                { date: "10,191", event: "Paul unites the Fremen tribes under his leadership as Muad'Dib." },
+                { date: "10,191", event: "The Fremen launch a revolution, culminating in the defeat of the Emperor and Harkonnens." }
+            ],
+            [
+                { name: "Paul Atreides", role: "Protagonist, heir to House Atreides, later Muad’Dib", background: "Trained by his Bene Gesserit mother and Atreides retainers, Paul is the Kwisatz Haderach, bred to access ancestral memories. Spice awakens his prescience on Arrakis.", motivations: "Seeks family loyalty and revenge, later aims to protect the Fremen and shape humanity’s future, fearing a jihad.", developments: ["Arrives on Arrakis", "Survives attack", "Flees to desert", "Becomes Kwisatz Haderach", "Kills Jamis", "Becomes Muad’Dib", "Leads revolution", "Marries Irulan"], relationships: { family: ["Duke Leto (father)", "Lady Jessica (mother)", "Alia (sister)"], allies: ["Duncan Idaho", "Gurney Halleck", "Thufir Hawat", "Stilgar", "Chani", "Liet-Kynes"], enemies: ["Baron Harkonnen", "Emperor Shaddam IV", "Feyd-Rautha", "Reverend Mother Mohiam"] } },
+                { name: "Lady Jessica", role: "Bene Gesserit concubine, Paul’s mother", background: "A Bene Gesserit who bore Paul against orders, Jessica is skilled in the Voice and control.", motivations: "Protects Paul, fulfills her training, secures their Fremen place.", developments: ["Moves to Arrakis", "Survives attack", "Adapts to Fremen", "Becomes Reverend Mother", "Guides Paul"], relationships: { family: ["Paul (son)", "Alia (daughter)", "Duke Leto (concubine)"], allies: ["Fremen", "Stilgar", "Chani"], enemies: ["Harkonnens", "Bene Gesserit"] } },
+                { name: "Duke Leto Atreides", role: "Head of House Atreides, Paul’s father", background: "A just leader aiming to leverage the Fremen.", motivations: "Strengthens Atreides, protects family, challenges Emperor.", developments: ["Accepts Arrakis", "Seeks Fremen alliance", "Betrayed by Yueh", "Dies"], relationships: { family: ["Paul (son)", "Jessica (concubine)"], allies: ["Thufir Hawat", "Gurney Halleck", "Duncan Idaho"], enemies: ["Baron Harkonnen", "Emperor Shaddam IV", "Dr. Yueh"] } },
+                { name: "Baron Vladimir Harkonnen", role: "Antagonist, head of House Harkonnen", background: "A ruthless leader thriving on cruelty.", motivations: "Reclaims Arrakis, destroys Atreides, grooms Feyd-Rautha.", developments: ["Plots with Emperor", "Retakes Arrakis", "Underestimates Paul", "Killed by Alia"], relationships: { family: ["Feyd-Rautha (nephew)"], allies: ["Emperor Shaddam IV", "Piter De Vries", "Sardaukar"], enemies: ["Paul", "Leto", "Fremen"] } },
+                { name: "Chani", role: "Fremen warrior, Paul’s lover", background: "Liet-Kynes’ daughter, a skilled Fremen fighter.", motivations: "Loves Paul, supports Fremen, fears his power.", developments: ["Meets Paul", "Teaches Fremen ways", "Becomes partner", "Fights in revolution"], relationships: { family: ["Liet-Kynes (father)"], allies: ["Paul", "Stilgar", "Fremen"], enemies: ["Harkonnens"] } },
+                { name: "Stilgar", role: "Fremen Naib, Paul’s ally", background: "A pragmatic Fremen leader.", motivations: "Liberates Arrakis, preserves culture, supports Paul.", developments: ["Leads Sietch Tabr", "Accepts Paul", "Commands revolution", "Remains loyal"], relationships: { allies: ["Paul", "Jessica", "Chani", "Fremen"], enemies: ["Harkonnens", "Sardaukar"] } }
+            ],
+            [
+                { name: "Arrakeen", description: "The fortified capital of Arrakis, a dusty city of political strife.", events: ["Atreides arrive", "Leto negotiates", "Attack kills Leto", "Paul and Jessica escape"], characters: ["Paul Atreides", "Lady Jessica", "Duke Leto", "Thufir Hawat", "Gurney Halleck", "Duncan Idaho", "Baron Harkonnen", "Piter De Vries", "Dr. Yueh"] },
+                { name: "Sietch Tabr", description: "A hidden Fremen cave settlement, a hub of culture and strategy.", events: ["Paul and Jessica accepted", "Paul kills Jamis", "Paul becomes Muad’Dib", "Revolution planned", "Paul rides sandworm"], characters: ["Paul Atreides", "Lady Jessica", "Stilgar", "Chani", "Liet-Kynes", "Jamis"] },
+                { name: "The Desert", description: "Arrakis’ vast dunes, home to sandworms and spice.", events: ["Paul and Jessica flee", "Meet Fremen", "Paul rides sandworm", "Guerrilla attacks", "Final battle"], characters: ["Paul Atreides", "Lady Jessica", "Stilgar", "Chani", "Fremen", "Baron Harkonnen (indirectly)"] }
+            ],
+            [
+                { name: "Power and Politics", description: "Explores power struggles over spice, akin to oil, with the Emperor’s plot and Paul’s disruption as examples." },
+                { name: "Religion and Prophecy", description: "Paul’s rise via seeded myths (e.g., sandworm riding) questions faith’s manipulation." },
+                { name: "Ecology and Environment", description: "Arrakis’ desert and Kynes’ greening vision (e.g., water caches) highlight nature’s role." },
+                { name: "Destiny and Free Will", description: "Paul’s visions (e.g., jihad) explore fate versus choice." }
+            ],
+            "Dune introduces Paul, spice, and themes like power and ecology. His victory sets up Dune Messiah, exploring his reign’s consequences—jihad, guilt, and loss—while Chani and Alia’s roles grow."
+        );
+
+
+const duneMessiah = new Novel(
+    "Dune Messiah",
+    {
+        description: "Set twelve years after the events of Dune, Dune Messiah explores the consequences of Paul Atreides’ rise to power. The story unfolds in a galaxy reshaped by Paul’s rule, with Arrakis as the center of a vast empire. The spice melange continues to drive political and religious fervor, while Paul grapples with the burdens of his prescient visions and the violent jihad waged in his name.",
+        planets: [
+            { name: "Arrakis", description: "Now the seat of Paul’s empire, Arrakis remains a harsh desert planet, though its political and religious significance has grown. The Fremen, once desert nomads, are now the enforcers of Paul’s rule, and the planet is a pilgrimage site for those who worship Muad’Dib." },
+            { name: "Caladan", description: "The former home of House Atreides, now a distant memory for Paul, symbolizing the life and family he lost." },
+            { name: "Giedi Prime", description: "The Harkonnen homeworld, diminished in power but still a symbol of the old regime’s cruelty." },
+            { name: "Kaitain", description: "The former Imperial capital, now overshadowed by Arrakis but still a center of political intrigue." }
+        ]
+    },
+    [
+        { summary: "Paul’s Rule as Emperor", details: "Paul, now Emperor Muad’Dib, governs a galaxy reshaped by his Fremen forces. His rule is marked by a violent jihad that has claimed billions of lives, a burden he foresaw but could not prevent. Despite his power, Paul faces growing conspiracies from factions like the Bene Gesserit, Spacing Guild, and Tleilaxu, who seek to undermine his authority." },
+        { summary: "The Conspiracy Against Paul", details: "A plot to assassinate Paul is orchestrated by the Bene Gesserit, Spacing Guild, and Tleilaxu. They create a ghola (clone) of Duncan Idaho, named Hayt, with latent memories designed to trigger Paul’s downfall. The conspirators also manipulate Paul’s sister, Alia, and his consort, Chani, to weaken his position." },
+        { summary: "Paul’s Struggle with Prescience", details: "Paul’s prescient abilities show him multiple futures, including his own death and the potential loss of Chani. He is torn between his love for Chani and the need to secure his legacy through an heir with Princess Irulan, his political wife. His visions also reveal the inevitability of his downfall." },
+        { summary: "The Birth of Paul’s Children", details: "Chani, despite the conspirators’ attempts to prevent it, becomes pregnant with Paul’s twins. During childbirth, she dies, but not before giving birth to Leto II and Ghanima. This event fulfills Paul’s visions and sets the stage for his final act as Emperor." },
+        { summary: "Paul’s Blindness and Departure", details: "Blinded by a stone burner during an assassination attempt, Paul uses his prescience to navigate the world. After Chani’s death, he walks into the desert, leaving his empire to his sister Alia and his newborn children, fulfilling the Fremen tradition for the blind." }
+    ],
+    [
+        { date: "10,203", event: "Paul’s rule as Emperor is marked by the ongoing jihad, spreading his influence across the galaxy." },
+        { date: "10,203", event: "The conspiracy against Paul begins, involving the Bene Gesserit, Spacing Guild, and Tleilaxu." },
+        { date: "10,203", event: "Hayt, the ghola of Duncan Idaho, is introduced to Paul’s court with hidden programming." },
+        { date: "10,203", event: "Chani becomes pregnant with Paul’s twins, Leto II and Ghanima." },
+        { date: "10,203", event: "Paul is blinded by a stone burner during an assassination attempt." },
+        { date: "10,203", event: "Chani dies in childbirth, giving birth to Leto II and Ghanima." },
+        { date: "10,203", event: "Paul walks into the desert, leaving his empire to Alia and his children." }
+    ],
+    [
+        { name: "Paul Atreides", role: "Emperor Muad’Dib", background: "Once the messianic leader of the Fremen, Paul now rules as Emperor, burdened by the consequences of his prescient visions and the jihad waged in his name.", motivations: "Seeks to stabilize his empire while grappling with the inevitability of his downfall and the need to secure his legacy.", developments: ["Faces conspiracies", "Struggles with prescience", "Loses Chani", "Blinded", "Walks into the desert"], relationships: { family: ["Chani (concubine)", "Alia (sister)", "Leto II (son)", "Ghanima (daughter)"], allies: ["Stilgar", "Duncan Idaho (Hayt)"], enemies: ["Bene Gesserit", "Spacing Guild", "Tleilaxu"] } },
+        { name: "Alia Atreides", role: "Paul’s sister, regent", background: "Born with the memories of her ancestors, Alia is a powerful figure in Paul’s court, but her youth and the influence of her inner voices make her vulnerable to manipulation.", motivations: "Supports Paul’s rule while navigating her own burgeoning powers and the conspirators’ influence.", developments: ["Acts as regent", "Faces inner turmoil", "Assumes control after Paul’s departure"], relationships: { family: ["Paul (brother)", "Leto II (nephew)", "Ghanima (niece)"], allies: ["Stilgar", "Duncan Idaho (Hayt)"], enemies: ["Conspirators"] } },
+        { name: "Chani", role: "Paul’s consort", background: "A Fremen warrior and Paul’s beloved, Chani is central to his personal life and his connection to the Fremen.", motivations: "Loves Paul and supports his rule, but fears the consequences of his power.", developments: ["Becomes pregnant", "Dies in childbirth"], relationships: { family: ["Paul (lover)", "Leto II (son)", "Ghanima (daughter)"], allies: ["Fremen", "Stilgar"], enemies: ["Conspirators"] } },
+        { name: "Duncan Idaho (Hayt)", role: "Ghola, former Atreides retainer", background: "Resurrected as a ghola by the Tleilaxu, Hayt is gifted to Paul with hidden programming to betray him.", motivations: "Struggles with his identity and loyalty to Paul, ultimately rejecting his programming.", developments: ["Introduced to Paul’s court", "Regains memories", "Rejects programming"], relationships: { family: [], allies: ["Paul", "Alia"], enemies: ["Tleilaxu"] } },
+        { name: "Stilgar", role: "Fremen leader, Paul’s ally", background: "A loyal Fremen commander, Stilgar continues to support Paul’s rule but is uneasy with the changes to Fremen culture.", motivations: "Preserves Fremen traditions while serving Paul’s empire.", developments: ["Commands Fremen forces", "Supports Paul’s decisions"], relationships: { family: [], allies: ["Paul", "Alia", "Chani"], enemies: ["Conspirators"] } },
+        { name: "Scytale", role: "Tleilaxu Face Dancer, conspirator", background: "A shapeshifting agent of the Tleilaxu, Scytale is a key figure in the plot to overthrow Paul.", motivations: "Seeks to destabilize Paul’s rule and advance Tleilaxu interests.", developments: ["Orchestrates conspiracy", "Attempts to manipulate Paul"], relationships: { family: [], allies: ["Bene Gesserit", "Spacing Guild"], enemies: ["Paul", "Alia"] } }
+    ],
+    [
+        { name: "Arrakeen", description: "The capital of Arrakis, now the seat of Paul’s empire, a city transformed by his rule into a center of religious and political power.", events: ["Paul’s court operates", "Conspirators meet", "Chani gives birth"], characters: ["Paul Atreides", "Alia Atreides", "Chani", "Duncan Idaho (Hayt)", "Stilgar", "Scytale"] },
+        { name: "The Desert", description: "Still a harsh wilderness, the desert remains a place of refuge and tradition for the Fremen, as well as a symbol of Paul’s connection to his past.", events: ["Paul walks into the desert", "Fremen maintain traditions"], characters: ["Paul Atreides", "Fremen"] }
+    ],
+    [
+        { name: "Power and Its Consequences", description: "Explores the burdens of leadership and the unintended consequences of Paul’s rise, such as the jihad and his struggle to control his empire." },
+        { name: "Destiny and Free Will", description: "Paul’s prescient visions trap him in a web of inevitability, raising questions about whether he can alter his fate." },
+        { name: "Religion and Manipulation", description: "Paul’s role as a messianic figure is deconstructed, showing how his mythos is used to control the masses." },
+        { name: "Identity and Memory", description: "The ghola Hayt’s struggle with his past identity reflects broader themes of self and loyalty." }
+    ],
+    "Dune Messiah continues Paul’s story from Dune, exploring the consequences of his rule and the personal toll of his power. It sets up the rise of his children, Leto II and Ghanima, in Children of Dune."
+);
+
+
+const childrenOfDune = new Novel(
+    "Children of Dune",
+    {
+        description: "Set nine years after the events of Dune Messiah, Children of Dune unfolds in a galactic empire reeling from Paul Atreides’ legacy. Alia Atreides rules as regent for Paul’s twin children, Leto II and Ghanima, but her possession by the ancestral memories of Baron Vladimir Harkonnen has plunged the Imperium into chaos. Arrakis, once a stark desert world, is undergoing a profound ecological transformation driven by Paul’s vision to green the planet, introducing water sources and vegetation. This shift disrupts the delicate balance of sandworms, spice production, and Fremen culture, creating tension between tradition and progress. Amidst political conspiracies and religious upheaval, Leto II emerges as a figure destined to reshape humanity’s future through his radical transformation.",
+        planets: [
+            { name: "Arrakis", description: "The desert planet, known as Dune, is in the midst of ecological change. Sparse greenery and artificial water channels now dot the landscape, reducing the vast dunes that once defined it. The Fremen, traditionally desert nomads, struggle to adapt as their sietches become less isolated and their dependence on sandworms wanes. Spice production, the lifeblood of the galaxy, faces decline as sandworm habitats shrink, intensifying political stakes. Arrakis remains the spiritual and administrative heart of the empire, with Arrakeen as its bustling capital." },
+            { name: "Caladan", description: "The lush, oceanic homeworld of House Atreides contrasts sharply with Arrakis. Its temperate climate, abundant water, and rolling hills evoke a lost paradise for the Atreides family. Lady Jessica returns here briefly before traveling to Arrakis, bringing with her the weight of her past and her hopes for her grandchildren’s future." },
+            { name: "Salusa Secundus", description: "A rugged, unforgiving planet once used as the Emperor’s prison world, Salusa Secundus is now the stronghold of the exiled House Corrino. Its barren terrain and harsh conditions mirror the brutal ambitions of Wensicia Corrino, who trains her son Farad’n here for a bid to reclaim the throne." },
+            { name: "Kaitain", description: "The former seat of the Padishah Emperor, Kaitain retains its grandeur with ornate palaces and manicured gardens. Though its political influence has diminished under Alia’s erratic rule from Arrakis, it remains a hub for scheming nobles and remnants of the old Imperial court." }
+        ]
+    },
+    [
+        { summary: "Alia’s Regency and Descent into Madness", details: "Alia Atreides, now in her twenties, governs as regent for her niece and nephew, Leto II and Ghanima. Her mind, burdened by the ancestral memories awakened in utero, has succumbed to possession by Baron Vladimir Harkonnen, her grandfather. This inner conflict manifests as tyrannical policies—enforced religious conformity, suppression of dissent, and brutal purges of perceived enemies. The Fremen, once loyal to Paul, grow disillusioned as Alia’s regime clashes with their traditions, while her erratic behavior alienates allies like Stilgar and Duncan Idaho. Her descent marks the unraveling of Paul’s empire, setting the stage for external threats." },
+        { summary: "Wensicia’s Conspiracy Against the Atreides Twins", details: "Wensicia Corrino, sister of the deposed Emperor Shaddam IV, orchestrates a plot from Salusa Secundus to assassinate Leto II and Ghanima. She trains two Laza tigers—genetically enhanced predators—to hunt the twins in the desert, intending to clear the path for her son, Farad’n, to reclaim the Imperial throne. The plan is bolstered by stolen technology and Corrino loyalists, but the twins’ prescient abilities allow them to anticipate and evade the attack. This conspiracy exposes the persistent threat of the old regime and forces Leto and Ghanima to confront their vulnerability." },
+        { summary: "The Preacher’s Return and Warnings", details: "A blind, enigmatic figure known as The Preacher emerges in Arrakeen’s streets, railing against the corruption of Paul’s religious legacy. Revealed as Paul Atreides, he has survived his desert exile and now seeks to dismantle the cult of Muad’Dib that Alia exploits. His sermons stir unrest among the populace and Fremen, warning of the dangers of blind faith and centralized power. His presence complicates the twins’ plans, as they grapple with their father’s legacy while pursuing their own destinies." },
+        { summary: "Leto’s Vision of the Golden Path", details: "Haunted by prescient visions, Leto II flees to the desert to escape both Wensicia’s assassins and Alia’s spies. In a remote sietch, he consumes a massive dose of spice essence, triggering a trance that reveals the Golden Path—a radical, millennia-long plan to prevent humanity’s extinction. He foresees that humanity’s reliance on spice and predictable patterns will lead to stagnation and collapse unless he imposes a prolonged period of enforced peace and genetic diversification. This vision drives his decision to merge with sandtrout, initiating his transformation into a sandworm-human hybrid." },
+        { summary: "Leto’s Transformation into a Hybrid", details: "In the depths of the desert, Leto II begins his transformation by allowing sandtrout—larval sandworms—to encase his body. The sandtrout fuse with his skin, forming a living symbiosis that grants him superhuman strength, near-invulnerability, and vastly extended lifespan. This painful process marks the start of his evolution into the God Emperor, a being capable of ruling for thousands of years. His transformation is both a physical and philosophical shift, embodying his acceptance of a solitary, tyrannical destiny to ensure the Golden Path." },
+        { summary: "The Fall of Alia and Leto’s Ascension", details: "Leto II returns to Arrakeen, his body now partially transformed, and confronts Alia in the palace. He exposes her possession by Baron Harkonnen, shattering her authority. Overwhelmed by guilt and the Baron’s dominance, Alia leaps from a high window, ending her life. Leto seizes control of the Imperium, declaring his intent to guide humanity along the Golden Path. Ghanima, though grieving, supports his rise, agreeing to a political marriage with Farad’n to secure alliances and stabilize the empire." },
+        { summary: "The Preacher’s Death and Legacy", details: "During a riot sparked by his sermons, The Preacher—Paul Atreides—is assassinated by a mob loyal to Alia’s regime. His death marks the end of Paul’s direct influence, leaving Leto II and Ghanima to carry forward the Atreides legacy. Paul’s final act as The Preacher reinforces the novel’s critique of religious fanaticism, while his children’s survival ensures the continuation of his bloodline and vision in a new form." }
+    ],
+    [
+        { date: "circa 10,212 AG", event: "Alia’s regency grows increasingly unstable as Baron Harkonnen’s memories dominate her mind, leading to tyrannical rule." },
+        { date: "circa 10,212 AG", event: "Wensicia Corrino launches her conspiracy, deploying Laza tigers to assassinate Leto II and Ghanima in the desert." },
+        { date: "circa 10,212 AG", event: "The Preacher, revealed as Paul Atreides, begins preaching in Arrakeen against the corruption of his legacy." },
+        { date: "circa 10,212 AG", event: "Leto II flees to the desert, undergoes a spice trance, and envisions the Golden Path as humanity’s salvation." },
+        { date: "circa 10,212 AG", event: "Leto II initiates his transformation by merging with sandtrout, beginning his evolution into a sandworm-human hybrid." },
+        { date: "circa 10,212 AG", event: "Leto II confronts Alia in Arrakeen, exposing her possession; Alia commits suicide by leaping from a window." },
+        { date: "circa 10,212 AG", event: "The Preacher is killed during a riot, ending Paul Atreides’ direct influence on the Imperium." },
+        { date: "circa 10,212 AG", event: "Leto II assumes control of the Imperium, declaring his intent to enforce the Golden Path, with Ghanima’s support." }
+    ],
+    [
+        { name: "Leto II Atreides", role: "Protagonist, heir to Paul Atreides, future God Emperor", background: "Born with the full ancestral memories of his lineage due to his mother Chani’s spice exposure, Leto II is a pre-born child with extraordinary prescience. Trained by Jessica and guided by Paul’s legacy, he is uniquely equipped to envision and enact the Golden Path.", motivations: "Driven by a desire to prevent humanity’s extinction, Leto sacrifices his humanity to become a tyrannical hybrid ruler, ensuring long-term survival through enforced peace and genetic diversity.", developments: ["Survives Wensicia’s assassination attempt with Ghanima", "Flees to the desert to escape Alia’s spies", "Undergoes a spice trance revealing the Golden Path", "Merges with sandtrout to begin his transformation", "Returns to Arrakeen with enhanced strength", "Confronts Alia, leading to her suicide", "Assumes control of the Imperium"], relationships: { family: ["Ghanima (twin sister)", "Paul (father)", "Chani (mother)", "Alia (aunt)", "Jessica (grandmother)"], allies: ["Ghanima", "Jessica", "Duncan Idaho", "Stilgar"], enemies: ["Wensicia Corrino", "Alia (possessed)", "House Corrino loyalists"] } },
+        { name: "Ghanima Atreides", role: "Leto’s twin sister, co-heir to Paul’s legacy", background: "Like Leto, Ghanima is pre-born with ancestral memories, granting her wisdom beyond her years. She shares Leto’s prescient abilities but opts for a more human path, supporting his transformation while preserving her own identity.", motivations: "Seeks to honor her parents’ legacy and support Leto’s vision, while grappling with the personal cost of their destinies.", developments: ["Evades Wensicia’s tigers with Leto", "Aids Leto in planning their escape", "Remains in sietch to mislead pursuers", "Witnesses Alia’s fall", "Agrees to marry Farad’n for political stability"], relationships: { family: ["Leto II (twin brother)", "Paul (father)", "Chani (mother)", "Alia (aunt)", "Jessica (grandmother)"], allies: ["Leto II", "Jessica", "Duncan Idaho", "Stilgar"], enemies: ["Wensicia Corrino", "Alia (possessed)"] } },
+        { name: "Alia Atreides", role: "Regent of the Imperium, Paul’s sister", background: "Born during Dune with ancestral memories due to Jessica’s spice agony, Alia’s mind has been overtaken by Baron Harkonnen, her maternal grandfather. Once a revered figure, she now rules with paranoia and cruelty.", motivations: "Initially aims to preserve Paul’s empire, but her possession drives her to maintain power at all costs, even as it destroys her.", developments: ["Imposes harsh religious orthodoxy", "Alienates Fremen and allies", "Faces rebellion from within", "Confronted by Leto II", "Commits suicide after losing control to the Baron"], relationships: { family: ["Paul (brother)", "Leto II (nephew)", "Ghanima (niece)", "Jessica (mother)"], allies: ["Duncan Idaho (initially)", "religious fanatics"], enemies: ["Leto II", "Ghanima", "Jessica", "The Preacher"] } },
+        { name: "Lady Jessica", role: "Bene Gesserit, mother of Paul and Alia", background: "A Reverend Mother trained in Bene Gesserit disciplines, Jessica returns from Caladan to Arrakis to protect her grandchildren and confront Alia’s corruption. Her experience and foresight make her a pivotal figure.", motivations: "Driven by maternal instinct to save Leto and Ghanima, Jessica also seeks to redeem the Atreides legacy from Alia’s ruin.", developments: ["Leaves Caladan for Arrakis", "Investigates Alia’s instability", "Trains Farad’n in Bene Gesserit ways", "Supports Leto’s rise", "Mourns Alia’s death"], relationships: { family: ["Paul (son)", "Alia (daughter)", "Leto II (grandson)", "Ghanima (granddaughter)"], allies: ["Duncan Idaho", "Gurney Halleck", "Stilgar"], enemies: ["Alia (possessed)", "Wensicia Corrino"] } },
+        { name: "Duncan Idaho", role: "Ghola, loyal Atreides retainer", background: "Resurrected as Hayt in Dune Messiah, Duncan has regained his original memories and serves as a protector and mentor to Leto and Ghanima. His ghola nature adds layers to his loyalty.", motivations: "Remains steadfastly loyal to House Atreides, aiming to shield the twins from harm and restore order.", developments: ["Guards Leto and Ghanima", "Investigates Alia’s behavior", "Confronts Alia alongside Leto", "Supports Leto’s ascension"], relationships: { family: [], allies: ["Leto II", "Ghanima", "Jessica", "Stilgar"], enemies: ["Alia (possessed)", "Wensicia Corrino"] } },
+        { name: "Stilgar", role: "Fremen Naib, traditional leader", background: "A veteran of Paul’s revolution, Stilgar commands the Fremen but struggles with the ecological changes eroding their desert lifestyle. His loyalty to the Atreides endures.", motivations: "Preserves Fremen heritage while aiding Leto and Ghanima, torn between past traditions and the new order.", developments: ["Leads Fremen loyal to the twins", "Protects sietches from Alia’s forces", "Supports Leto’s takeover"], relationships: { family: [], allies: ["Leto II", "Ghanima", "Jessica", "Duncan Idaho"], enemies: ["Alia (possessed)", "Wensicia Corrino"] } },
+        { name: "The Preacher", role: "Mysterious figure, Paul Atreides in disguise", background: "Blinded after Dune Messiah, Paul survived his desert exile and returns as The Preacher to challenge the religious cult built around his name. His identity is confirmed late in the novel.", motivations: "Seeks to expose the dangers of fanaticism and dismantle the mythos Alia exploits, offering a final warning to his children.", developments: ["Arrives in Arrakeen preaching dissent", "Stirs unrest among the populace", "Killed by a mob during a riot"], relationships: { family: ["Leto II (son)", "Ghanima (daughter)", "Alia (sister)", "Jessica (mother)"], allies: [], enemies: ["Alia", "religious fanatics"] } },
+        { name: "Wensicia Corrino", role: "Conspirator, House Corrino matriarch", background: "Sister of Shaddam IV, Wensicia lives in exile on Salusa Secundus, plotting to restore her family’s rule by targeting Paul’s heirs.", motivations: "Driven by ambition to see her son Farad’n crowned Emperor, she seeks vengeance against the Atreides.", developments: ["Devises assassination plot with Laza tigers", "Sends Farad’n to Arrakis", "Fails as Leto thwarts her plans"], relationships: { family: ["Farad’n (son)", "Shaddam IV (brother)"], allies: ["Corrino loyalists"], enemies: ["Leto II", "Ghanima", "Jessica"] } },
+        { name: "Farad’n Corrino", role: "Heir to House Corrino", background: "Son of Wensicia, Farad’n is a scholarly young man trained for leadership, caught between his mother’s ambitions and his own potential redemption.", motivations: "Initially follows Wensicia’s plan but seeks knowledge and alliance under Jessica’s influence.", developments: ["Sent to Arrakis as part of the plot", "Trained by Jessica", "Marries Ghanima for peace"], relationships: { family: ["Wensicia (mother)"], allies: ["Jessica (later)"], enemies: ["Leto II (initially)"] } }
+    ],
+    [
+        { name: "Sietch Tabr", description: "A fortified Fremen cave settlement nestled in the desert cliffs, Sietch Tabr remains a bastion of traditional Fremen life despite encroaching greenery. Its water stores and communal spaces reflect a fading way of life.", events: ["Leto and Ghanima take refuge after escaping tigers", "Fremen elders debate Alia’s rule", "Leto plans his desert journey"], characters: ["Leto II", "Ghanima", "Stilgar", "Fremen"] },
+        { name: "Arrakeen", description: "The bustling capital of Arrakis, Arrakeen is a sprawling city of stone and dust, now adorned with traces of vegetation. It houses Alia’s palace and serves as the epicenter of political and religious strife.", events: ["Alia enforces her decrees", "The Preacher’s sermons ignite riots", "Leto confronts Alia in the palace"], characters: ["Alia", "Duncan Idaho", "Jessica", "Leto II", "Ghanima", "The Preacher"] },
+        { name: "The Desert", description: "Once an endless expanse of dunes, the desert is now interspersed with patches of grass and small oases, reflecting Paul’s ecological vision. Sandworms still roam, but their territory is shrinking.", events: ["Leto escapes into the desert", "Undergoes spice trance near a worm lair", "Merges with sandtrout under the stars", "The Preacher preaches to pilgrims"], characters: ["Leto II", "The Preacher", "Fremen"] },
+        { name: "Jacurutu", description: "A forbidden sietch shrouded in legend, Jacurutu is a desolate outpost once home to outcast Fremen. Its isolation makes it a refuge for Leto during his transformation.", events: ["Leto seeks solitude here", "Begins sandtrout merging process"], characters: ["Leto II"] }
+    ],
+    [
+        { name: "Power and Corruption", description: "Alia’s possession by Baron Harkonnen exemplifies how power corrupts, turning her from a protector into a despot. Her brutal purges and religious fanaticism mirror the Baron’s own cruelty, showing the cyclical nature of tyranny." },
+        { name: "Destiny and Sacrifice", description: "Leto II’s transformation into a sandworm hybrid is a profound sacrifice, trading his humanity for a future where humanity survives. His spice trance and merger with sandtrout highlight the personal cost of his destiny." },
+        { name: "Tradition vs. Progress", description: "The Fremen’s resistance to Arrakis’ greening—seen in Stilgar’s dismay and the decline of sandworms—pits their desert heritage against Paul’s ecological legacy, questioning the price of change." },
+        { name: "Identity and Transformation", description: "Leto’s physical shift into a hybrid and Paul’s final role as The Preacher explore identity’s fluidity. Leto’s merger with sandtrout and Paul’s rejection of his mythos reflect the struggle to define oneself amidst power." },
+        { name: "Legacy and Responsibility", description: "Paul’s return as The Preacher and the twins’ rise address the weight of inheritance. Leto and Ghanima must reconcile their father’s jihad with their own paths, choosing responsibility over destruction." }
+    ],
+    "Children of Dune ties up Paul’s arc with his death as The Preacher, while launching Leto II’s transformation into the God Emperor, a role fully realized in God Emperor of Dune. It delves into the fallout of Paul’s jihad—Alia’s corruption, Arrakis’ ecological shift, and the Fremen’s decline—bridging the original trilogy’s personal stakes with the epic scope of Leto’s reign."
+);
+
+
+
+const godEmperorOfDune = new Novel(
+    "God Emperor of Dune",
+    {
+        description: "Set 3,500 years after Children of Dune, God Emperor of Dune unfolds in a radically transformed Imperium under the iron rule of Leto II Atreides, now the God Emperor. Having merged with sandtrout, Leto has evolved into a sandworm-human hybrid, extending his life and wielding absolute power to enforce his Golden Path—a plan to secure humanity’s survival through enforced peace and genetic diversification. Arrakis, renamed Rakis, has completed its ecological transformation into a verdant planet, with the desert confined to a small Sareer. Spice production has dwindled, tightly controlled by Leto, reshaping the galaxy’s economy and power dynamics. The story explores Leto’s tyranny, his sacrifices, and the seeds of rebellion that threaten his millennia-long reign.",
+        planets: [
+            { name: "Rakis (Arrakis)", description: "Once a desert world, Rakis is now a lush planet with sprawling forests, rivers, and oceans, a testament to Paul and Leto’s ecological vision. The Sareer, a preserved desert remnant, is the last bastion of sandworms and spice production, guarded by Leto’s Fish Speakers. Rakis serves as the spiritual and political heart of Leto’s empire, its cities like Onn bustling with pilgrims and bureaucrats." },
+            { name: "Ix", description: "A technologically advanced planet, Ix thrives under Leto’s restrictions on machinery, producing subtle innovations that skirt his bans. Its sleek cities and hidden workshops reflect a culture of ingenuity and quiet defiance, pivotal in the rebellion against Leto." },
+            { name: "Caladan", description: "The ancestral Atreides homeworld remains a serene, oceanic planet, now a distant memory of Leto’s human past. Its significance lies in its contrast to Rakis, evoking nostalgia for a simpler era." },
+            { name: "Giedi Prime (Gammu)", description: "Renamed Gammu, the former Harkonnen stronghold has evolved into a militarized world under Leto’s oversight. Its dark, industrial landscape persists, now serving as a training ground for his Fish Speakers and a symbol of past tyranny." }
+        ]
+    },
+    [
+        { summary: "Leto II’s Tyrannical Reign", details: "Leto II, now a massive sandworm-human hybrid, rules the Imperium from his Citadel on Rakis. His 3,500-year reign enforces the Golden Path through strict control—banning advanced technology, limiting spice distribution, and maintaining peace via his all-female Fish Speaker army. His prescient journals, hidden across the galaxy, record his thoughts and plans, revealing a ruler both omnipotent and isolated. Society stagnates under his oppression, with dissent simmering beneath the surface." },
+        { summary: "The Arrival of Siona Atreides", details: "Siona Atreides, a descendant of Ghanima and Farad’n, emerges as a rebel leader opposing Leto’s rule. Born with a genetic trait invisible to prescience, she represents a wildcard in Leto’s vision. Her father, Moneo Atreides, serves as Leto’s majordomo, torn between loyalty and his daughter’s defiance. Siona’s arrival in Onn marks the beginning of a test Leto has engineered to ensure humanity’s evolution." },
+        { summary: "The New Duncan Idaho Ghola", details: "The Tleilaxu provide Leto with a new Duncan Idaho ghola, the latest in a long line of clones serving the Atreides across millennia. This Duncan, retaining memories of his original life, is appalled by Leto’s transformation and the Imperium’s stagnation. Stationed in Onn, he grapples with his loyalty to Leto while forming a bond with Siona, setting the stage for rebellion." },
+        { summary: "Leto’s Testing of Siona", details: "Leto sends Siona into the Sareer with Duncan to face a trial of survival against sandworms and harsh conditions. He reveals his Golden Path’s purpose—to breed humans free of prescience’s shackles and foster resilience. Siona endures, stealing fragments of Leto’s journals, which expose his vulnerabilities and long-term goals. This test cements her hatred for Leto but also fulfills his genetic plan." },
+        { summary: "The Ixian Rebellion and Hwi Noree", details: "The Ixians, chafing under Leto’s tech bans, send Hwi Noree, an engineered human designed to charm him, as an ambassador to Rakis. Hwi’s empathy and beauty pierce Leto’s isolation, stirring his latent humanity and love—a calculated move by Ix to weaken him. Simultaneously, Ix collaborates with Siona, providing technology to challenge Leto’s rule, escalating tensions." },
+        { summary: "Leto’s Marriage Proposal and Betrayal", details: "Enamored with Hwi, Leto proposes marriage, planning a symbolic union in Tuono Village near the Sareer. Siona and Duncan, aided by Ixian tools, seize the moment to attack. During the ceremony, they detonate a stolen Ixian lasgun on a bridge over the Idaho River, shattering it. Leto falls into the water, where his sandtrout skin dissolves, releasing them back into the desert and ending his reign." },
+        { summary: "The Scattering and Leto’s Legacy", details: "Leto’s death triggers the Scattering—a diaspora as humanity, freed from his control, spreads across the universe with renewed vigor. The sandtrout begin restoring Rakis’ desert ecology, ensuring spice’s return. Siona inherits Leto’s vision, guiding a new era, while his journals, later discovered, reveal the depth of his sacrifice for humanity’s survival." }
+    ],
+    [
+        { date: "circa 13,712 AG", event: "Leto II’s 3,500-year reign as God Emperor enforces the Golden Path, maintaining peace and controlling spice across the Imperium." },
+        { date: "circa 13,712 AG", event: "Siona Atreides arrives in Onn, joining the rebellion against Leto and meeting Moneo, her father and Leto’s majordomo." },
+        { date: "circa 13,712 AG", event: "The Tleilaxu deliver a new Duncan Idaho ghola to Leto’s court in Onn, who begins questioning the God Emperor’s rule." },
+        { date: "circa 13,712 AG", event: "Leto sends Siona and Duncan into the Sareer for a survival test, revealing the Golden Path’s purpose." },
+        { date: "circa 13,712 AG", event: "Hwi Noree arrives from Ix, captivating Leto and sowing seeds of vulnerability in his rule." },
+        { date: "circa 13,712 AG", event: "Siona and Duncan attack Leto during his marriage proposal to Hwi in Tuono Village, killing him with an Ixian lasgun." },
+        { date: "circa 13,712 AG", event: "Leto’s death initiates the Scattering, as humanity disperses and sandtrout begin restoring Rakis’ desert." }
+    ],
+    [
+        { name: "Leto II Atreides", role: "God Emperor, ruler of the Imperium", background: "Once human, Leto merged with sandtrout 3,500 years ago, becoming a sandworm-human hybrid with a massive, segmented body and vestigial arms. His prescience and ancestral memories guide his Golden Path, a millennia-long plan to save humanity.", motivations: "Sacrifices his humanity to enforce peace, breed resilience, and free humanity from prescience, accepting isolation and tyranny.", developments: ["Rules for 3,500 years", "Tests Siona in the Sareer", "Falls in love with Hwi", "Proposes marriage", "Dies in rebellion"], relationships: { family: ["Ghanima (sister, ancestral)", "Paul (father, ancestral)", "Chani (mother, ancestral)"], allies: ["Moneo", "Fish Speakers"], enemies: ["Siona", "Duncan", "Ixians"] } },
+        { name: "Siona Atreides", role: "Rebel leader, Leto’s descendant", background: "A descendant of Ghanima and Farad’n, Siona carries a gene making her invisible to prescience, a trait Leto cultivated. Raised in rebellion, she despises Leto’s tyranny.", motivations: "Seeks to overthrow Leto to liberate humanity, driven by both personal hatred and a nascent understanding of his goals.", developments: ["Joins rebellion", "Meets Duncan", "Survives Sareer test", "Steals Leto’s journals", "Kills Leto"], relationships: { family: ["Moneo (father)"], allies: ["Duncan", "Ixians"], enemies: ["Leto", "Fish Speakers"] } },
+        { name: "Duncan Idaho", role: "Ghola, rebel ally", background: "The latest in a series of Tleilaxu gholas, this Duncan retains memories of his original life under Duke Leto. He struggles with Leto’s monstrous form and the Imperium’s decay.", motivations: "Loyal to the Atreides ideal, he rebels against Leto’s tyranny, aligning with Siona to restore freedom.", developments: ["Arrives in Onn", "Bonds with Siona", "Faces Sareer trial", "Plans Leto’s death", "Executes attack"], relationships: { family: [], allies: ["Siona", "Ixians"], enemies: ["Leto", "Fish Speakers"] } },
+        { name: "Moneo Atreides", role: "Leto’s majordomo, Siona’s father", background: "A descendant of Ghanima, Moneo is Leto’s trusted administrator, shaped by decades of service into a pragmatic, obedient aide.", motivations: "Serves Leto out of belief in the Golden Path, torn between duty and his daughter’s rebellion.", developments: ["Manages Leto’s court", "Advises on Siona", "Witnesses Leto’s fall"], relationships: { family: ["Siona (daughter)"], allies: ["Leto", "Fish Speakers"], enemies: ["Siona (indirectly)"] } },
+        { name: "Hwi Noree", role: "Ixian ambassador, Leto’s love", background: "Engineered by Ixians to be compassionate and alluring, Hwi is designed to exploit Leto’s human vulnerabilities. Raised in Ixian labs, she’s an anomaly in his controlled world.", motivations: "Genuinely loves Leto despite her origins, seeking connection rather than betrayal.", developments: ["Arrives on Rakis", "Charms Leto", "Accepts marriage proposal", "Dies in attack"], relationships: { family: [], allies: ["Ixians (initially)"], enemies: ["Siona", "Duncan"] } },
+        { name: "Nayla", role: "Fish Speaker commander", background: "A fiercely loyal soldier in Leto’s all-female army, Nayla embodies the devotion bred into the Fish Speakers over millennia.", motivations: "Worships Leto as a god, willing to die for his commands.", developments: ["Guards Leto", "Assists in Siona’s test", "Dies protecting Leto"], relationships: { family: [], allies: ["Leto", "Fish Speakers"], enemies: ["Siona", "Duncan"] } },
+        { name: "Malky", role: "Ixian conspirator (mentioned)", background: "An Ixian ambassador from Leto’s past, Malky helped design Hwi and influenced Leto’s vulnerabilities. Now deceased, his legacy drives Ix’s rebellion.", motivations: "Sought to undermine Leto for Ixian freedom, using cunning over force.", developments: ["Influences Leto (past)", "Shapes Hwi’s creation"], relationships: { family: [], allies: ["Ixians"], enemies: ["Leto"] } }
+    ],
+    [
+        { name: "The Citadel", description: "Leto’s impregnable fortress in the Sareer, a towering structure of stone and technology surrounded by desert. It houses his throne room and secret spice hoard.", events: ["Leto rules from here", "Siona and Duncan plan rebellion", "Hwi meets Leto"], characters: ["Leto II", "Moneo", "Hwi", "Nayla"] },
+        { name: "The Sareer", description: "A preserved desert within Rakis’ green expanse, the Sareer is a fenced-off wilderness with sandworms and dunes, maintained as a relic of old Arrakis.", events: ["Siona and Duncan face survival test", "Leto reveals Golden Path"], characters: ["Leto II", "Siona", "Duncan"] },
+        { name: "Onn", description: "Rakis’ capital city, a sprawling urban center with grand plazas and temples, filled with pilgrims and Fish Speakers enforcing Leto’s will.", events: ["Siona arrives", "Duncan meets rebels", "Leto holds court"], characters: ["Siona", "Duncan", "Moneo", "Hwi", "Nayla"] },
+        { name: "Tuono Village", description: "A small settlement near the Idaho River, chosen for Leto’s symbolic marriage to Hwi. Its rustic simplicity belies its role in his downfall.", events: ["Leto proposes to Hwi", "Siona and Duncan attack", "Leto dies"], characters: ["Leto II", "Siona", "Duncan", "Hwi", "Nayla"] }
+    ],
+    [
+        { name: "Tyranny and Sacrifice", description: "Leto’s 3,500-year rule as a hybrid tyrant enforces peace at the cost of freedom, a sacrifice to ensure the Golden Path’s success, seen in his isolation and control." },
+        { name: "Evolution and Adaptation", description: "The Golden Path breeds resilience, exemplified by Siona’s prescience-free gene and the Scattering, adapting humanity for survival beyond spice." },
+        { name: "Love and Vulnerability", description: "Hwi’s effect on Leto reveals his lingering humanity, a rare weakness exploited by Ix, contrasting his godlike power with personal longing." },
+        { name: "Stagnation vs. Renewal", description: "Leto’s enforced stasis—seen in the lack of tech and spice—clashes with the renewal sparked by his death, as humanity breaks free in the Scattering." },
+        { name: "Legacy and Memory", description: "Leto’s journals and Duncan’s recurring gholas explore how memory shapes identity and legacy, linking past Atreides ideals to a new future." }
+    ],
+    "God Emperor of Dune concludes Leto II’s transformation arc from Children of Dune, showcasing his reign and sacrifice. His death triggers the Scattering, setting up Heretics of Dune, where new powers like the Honored Matres emerge from humanity’s diaspora."
+);
+
+
+const hereticsOfDune = new Novel(
+    "Heretics of Dune",
+    {
+        description: "Set 1,500 years after God Emperor of Dune, Heretics of Dune unfolds in a galaxy reshaped by the Scattering—the diaspora triggered by Leto II’s death. Humanity has spread across uncharted regions, giving rise to new powers like the Honored Matres, a violent matriarchal order returning from the Scattering with advanced technology and a ruthless agenda. Rakis, once Arrakis, has reverted to a desert world after Leto’s sandtrout restored its ecology, and spice remains a scarce, coveted resource. The Bene Gesserit, now a dominant force, navigate this chaotic era from their stronghold on Chapterhouse, facing threats from the Honored Matres and the Tleilaxu, while a young girl, Sheeana, who can control sandworms, becomes a key figure in their plans.",
+        planets: [
+            { name: "Rakis", description: "Formerly Arrakis, Rakis has returned to its desert state, with vast dunes and sandworms thriving once more. Its ecology, restored by Leto’s sandtrout, supports limited spice production, fiercely guarded by a fragmented priesthood descended from the Fremen. The planet’s cities, like Keen, are dusty relics of Leto’s era, steeped in religious fervor and political decay." },
+            { name: "Chapterhouse", description: "The Bene Gesserit’s secret headquarters, Chapterhouse is a temperate planet with rolling hills and hidden orchards, gradually being transformed into a desert to mimic Rakis. Its fortified keeps and training grounds reflect the sisterhood’s disciplined power, now central to their survival strategy." },
+            { name: "Gammu (Giedi Prime)", description: "Renamed from Giedi Prime, Gammu is a militarized world of dark cities and industrial sprawl, controlled by the Bene Gesserit but infiltrated by Honored Matres. Its harsh landscape echoes its Harkonnen past, now a battleground of espionage and intrigue." },
+            { name: "Ix", description: "A technological hub, Ix flourishes in the post-Leto era, producing advanced weaponry and no-ships—invisible spacecraft—that defy the old prohibitions. Its gleaming cities and subterranean labs drive the Honored Matres’ power, making it a pivotal player in the galactic conflict." }
+        ]
+    },
+    [
+        { summary: "The Scattering’s Aftermath and New Threats", details: "1,500 years after Leto’s death, the Scattering has fragmented humanity into countless factions. The Honored Matres, a brutal matriarchal order, return from uncharted space with superior technology and a mission to dominate. Their violent conquests have decimated planets, forcing the Bene Gesserit to adapt. On Rakis, the priesthood clings to dwindling spice reserves, while the Tleilaxu plot in secret, unleashing Face Dancers—perfect mimics—to destabilize the old powers." },
+        { summary: "Sheeana’s Discovery on Rakis", details: "Sheeana Brugh, a young orphan on Rakis, gains fame for summoning and controlling sandworms after one devours her village. The Bene Gesserit, led by Mother Superior Taraza, see her as a potential religious figure to manipulate Rakis’ priesthood and secure spice. Sheeana’s ability, tied to Leto’s legacy, draws the attention of all factions, making her a prized asset in the escalating power struggle." },
+        { summary: "The Bene Gesserit’s Plan", details: "Taraza devises a bold strategy: protect Sheeana, train a new Duncan Idaho ghola on Gammu, and awaken his original memories to counter the Honored Matres. The ghola, raised by Lucilla, is guarded by Miles Teg, a revered Bashar whose military genius anchors the plan. The sisterhood aims to preserve their influence by adapting Leto’s Golden Path to this chaotic era, balancing survival with manipulation." },
+        { summary: "The Attack on Gammu", details: "Honored Matres infiltrate Gammu, seeking to capture the Duncan ghola and destroy Bene Gesserit operations. Miles Teg unleashes a devastating counterattack, revealing latent superhuman speed and prescience from his Atreides genes. He sacrifices himself to ensure Duncan, Sheeana, and Lucilla escape aboard a no-ship, exposing the Honored Matres’ brutality and sparking wider resistance." },
+        { summary: "The Destruction of Rakis", details: "The Honored Matres, enraged by resistance, obliterate Rakis with advanced weaponry, reducing it to a slag heap. Only one sandworm survives, smuggled aboard the no-ship by Sheeana and the Bene Gesserit. The priesthood is annihilated, and spice production ceases, plunging the galaxy into chaos as the last remnant of Leto’s ecology is lost—except for the worm held in secret." },
+        { summary: "Miles Teg’s Awakening", details: "Captured during the Gammu escape, Miles Teg is tortured by a Tleilaxu T-Probe, inadvertently unlocking his dormant abilities. He escapes, demonstrating unprecedented speed and tactical brilliance, and reunites with the Bene Gesserit on Chapterhouse. His transformation into a superhuman figure bolsters the sisterhood’s resolve against the Honored Matres." },
+        { summary: "Escape to Chapterhouse and Future Plans", details: "Sheeana, Duncan, and Lucilla land on Chapterhouse aboard the no-ship, bringing the last sandworm. Taraza dies in a prior skirmish, leaving Odrade as Mother Superior. The Bene Gesserit begin transforming Chapterhouse into a desert to cultivate spice, while Duncan’s restored memories and Teg’s abilities hint at a counteroffensive against the Honored Matres, setting the stage for a new era." }
+    ],
+    [
+        { date: "circa 15,212 AG", event: "The Scattering’s effects are felt as Honored Matres return, conquering planets and threatening the old Imperium’s remnants." },
+        { date: "circa 15,212 AG", event: "Sheeana Brugh is discovered on Rakis, controlling sandworms and drawing Bene Gesserit attention." },
+        { date: "circa 15,212 AG", event: "The Bene Gesserit deploy Miles Teg and Lucilla to train a new Duncan Idaho ghola on Gammu." },
+        { date: "circa 15,212 AG", event: "Honored Matres attack Gammu, forcing Teg to sacrifice himself as Duncan, Sheeana, and Lucilla escape." },
+        { date: "circa 15,212 AG", event: "Honored Matres destroy Rakis, leaving one sandworm preserved by the Bene Gesserit." },
+        { date: "circa 15,212 AG", event: "Miles Teg escapes Tleilaxu captivity, awakening his superhuman abilities." },
+        { date: "circa 15,212 AG", event: "Sheeana, Duncan, and Lucilla reach Chapterhouse with the last sandworm, as Odrade plans the Bene Gesserit’s next move." }
+    ],
+    [
+        { name: "Sheeana Brugh", role: "Sandworm controller, religious figure", background: "Orphaned on Rakis, Sheeana discovered her ability to summon sandworms as a child, earning her a messianic status among the priesthood. Trained by the Bene Gesserit, she bridges Leto’s legacy with their future plans.", motivations: "Seeks purpose beyond her orphanhood, embracing her role while wary of manipulation.", developments: ["Controls sandworms on Rakis", "Recruited by Bene Gesserit", "Escapes Rakis’ destruction", "Brings last worm to Chapterhouse"], relationships: { family: [], allies: ["Taraza", "Odrade", "Duncan", "Teg"], enemies: ["Honored Matres", "priesthood"] } },
+        { name: "Darwi Odrade", role: "Bene Gesserit leader, strategist", background: "A senior sister with Atreides ancestry, Odrade rises to Mother Superior after Taraza’s death. Her pragmatic yet visionary approach drives the Bene Gesserit’s survival.", motivations: "Preserves the sisterhood by adapting to new threats, aiming to outmaneuver the Honored Matres.", developments: ["Advises Taraza", "Leads Gammu mission", "Becomes Mother Superior", "Plans Chapterhouse desertification"], relationships: { family: [], allies: ["Taraza", "Teg", "Sheeana", "Duncan"], enemies: ["Honored Matres", "Tleilaxu"] } },
+        { name: "Miles Teg", role: "Bene Gesserit Bashar, military genius", background: "A descendant of House Atreides, Teg is a legendary commander with latent abilities unlocked under stress. His loyalty and brilliance anchor the Bene Gesserit’s defense.", motivations: "Protects the sisterhood and Duncan, driven by duty and honor.", developments: ["Trains Duncan on Gammu", "Repels Honored Matres attack", "Sacrifices himself", "Awakens superhuman powers", "Rejoins Chapterhouse"], relationships: { family: [], allies: ["Taraza", "Odrade", "Duncan", "Lucilla"], enemies: ["Honored Matres", "Tleilaxu"] } },
+        { name: "Duncan Idaho", role: "Ghola, Atreides loyalist", background: "The latest Tleilaxu ghola, Duncan is raised on Gammu with suppressed memories of past lives, which Lucilla awakens to counter the Honored Matres.", motivations: "Struggles with his identity, seeking freedom and purpose beyond being a pawn.", developments: ["Trained on Gammu", "Memories restored", "Escapes with Sheeana", "Reaches Chapterhouse"], relationships: { family: [], allies: ["Teg", "Lucilla", "Sheeana", "Odrade"], enemies: ["Honored Matres", "Tleilaxu"] } },
+        { name: "Lucilla", role: "Bene Gesserit Imprinter", background: "A skilled Imprinter tasked with awakening Duncan’s memories, Lucilla is a disciplined operative with deep loyalty to the sisterhood.", motivations: "Fulfills her mission to secure Duncan’s loyalty, driven by Bene Gesserit ideals.", developments: ["Trains Duncan", "Awakens his memories", "Escapes Gammu", "Protects Sheeana"], relationships: { family: [], allies: ["Teg", "Duncan", "Odrade"], enemies: ["Honored Matres"] } },
+        { name: "Taraza", role: "Mother Superior, planner", background: "The Bene Gesserit leader at the novel’s start, Taraza crafts a strategy to survive the Honored Matres using Sheeana and Duncan.", motivations: "Safeguards the sisterhood’s future through calculated risks and manipulation.", developments: ["Recruits Sheeana", "Deploys Teg to Gammu", "Dies in skirmish"], relationships: { family: [], allies: ["Odrade", "Teg", "Sheeana"], enemies: ["Honored Matres"] } },
+        { name: "Waff", role: "Tleilaxu Master, conspirator", background: "A cunning Tleilaxu leader, Waff controls Face Dancers and seeks to manipulate events using genetic engineering and deceit.", motivations: "Aims to elevate Tleilaxu power amidst chaos, exploiting all factions.", developments: ["Deploys Face Dancers", "Allies with Honored Matres", "Plans Duncan’s subversion"], relationships: { family: [], allies: ["Honored Matres (temporary)"], enemies: ["Bene Gesserit", "Teg"] } }
+    ],
+    [
+        { name: "Keen", description: "Rakis’ capital, a dusty city of mud-brick temples and spice silos, ruled by a decaying priesthood clinging to ancient rites.", events: ["Sheeana summons worms", "Bene Gesserit arrive", "Rakis destroyed"], characters: ["Sheeana", "Taraza", "priesthood"] },
+        { name: "Gammu Keep", description: "A fortified Bene Gesserit stronghold on Gammu, hidden within a grim urban sprawl, designed for secrecy and defense.", events: ["Duncan trained", "Honored Matres attack", "Teg’s counterattack"], characters: ["Teg", "Duncan", "Lucilla"] },
+        { name: "Chapterhouse Keep", description: "The central fortress on Chapterhouse, surrounded by fertile lands slowly turning to desert, a hub of Bene Gesserit strategy.", events: ["No-ship lands", "Desertification begins", "Plans formulated"], characters: ["Odrade", "Sheeana", "Duncan", "Lucilla"] },
+        { name: "The Desert of Rakis", description: "The vast dunes of Rakis, alive with sandworms, a sacred wilderness revered by the priesthood and Sheeana’s domain.", events: ["Sheeana controls worms", "Last worm smuggled"], characters: ["Sheeana", "sandworms"] }
+    ],
+    [
+        { name: "Survival and Adaptation", description: "The Bene Gesserit adapt Leto’s Golden Path to new threats, seen in Sheeana’s worm control and Chapterhouse’s desertification, ensuring survival in chaos." },
+        { name: "Power and Violence", description: "The Honored Matres’ brutal conquests contrast with the Bene Gesserit’s subtle power, as Rakis’ destruction highlights violence’s cost." },
+        { name: "Identity and Memory", description: "Duncan’s ghola memories and Teg’s awakening explore how past lives shape the present, echoing Leto’s legacy." },
+        { name: "Religion and Control", description: "Sheeana’s worm mastery revives religious awe, a tool the Bene Gesserit wield to manipulate Rakis’ faithful, reminiscent of Paul’s era." },
+        { name: "Technology and Evolution", description: "Ixian no-ships and Tleilaxu Face Dancers showcase technology’s role in humanity’s evolution post-Leto, driving conflict and change." }
+    ],
+    "Heretics of Dune builds on God Emperor of Dune’s Scattering, introducing the Honored Matres and reviving Rakis’ desert ecology. It sets up Chapterhouse: Dune, where the Bene Gesserit’s desertification of Chapterhouse and confrontation with the Honored Matres intensify."
+);
+
+
+const chapterhouseDune = new Novel(
+    "Chapterhouse: Dune",
+    {
+        description: "Set immediately after Heretics of Dune, Chapterhouse: Dune unfolds in a galaxy teetering on the brink of collapse as the Honored Matres escalate their conquests following Rakis’ destruction. The Bene Gesserit, led by Mother Superior Darwi Odrade, fortify Chapterhouse—a planet they’ve transformed into a desert to cultivate spice—as their last bastion against the Matres’ relentless aggression. Sheeana’s sandworm and Duncan Idaho’s ghola memories hold the keys to their survival, while the Tleilaxu’s final gambit and a mysterious external threat loom. The novel explores the sisterhood’s desperate bid to adapt, manipulate, and prevail in a universe reshaped by the Scattering.",
+        planets: [
+            { name: "Chapterhouse", description: "Once a temperate world of orchards and hills, Chapterhouse is now a burgeoning desert, engineered by the Bene Gesserit to mirror Rakis and sustain a transplanted sandworm. Its fortified keeps and underground lairs house the sisterhood’s operations, blending stark dunes with remnants of greenery in a tense juxtaposition of survival and transformation." },
+            { name: "Gammu (Giedi Prime)", description: "A grim, industrialized planet under Bene Gesserit control, Gammu’s dark cities and sprawling barracks serve as a staging ground for their resistance. Its harsh landscape, inherited from its Harkonnen past, is infiltrated by Honored Matres, making it a contested frontline." },
+            { name: "Buzzell", description: "An oceanic planet dotted with islands, Buzzell is a Bene Gesserit outpost famed for its soostones—valuable gems harvested by enslaved Phibians. Its serene waters belie its role as a strategic asset under threat from the Honored Matres." },
+            { name: "Junction", description: "A sprawling hub of space lanes once controlled by the Spacing Guild, Junction has been seized by the Honored Matres. Its labyrinthine corridors and docking bays now bustle with their forces, symbolizing their dominance over galactic travel." }
+        ]
+    },
+    [
+        { summary: "The Honored Matres’ Onslaught", details: "Following Rakis’ destruction, the Honored Matres intensify their campaign, annihilating Bene Gesserit planets with advanced weaponry and sexual domination tactics. Their rage-fueled conquests, driven by an unknown fear from the Scattering, threaten to eradicate the sisterhood. Odrade, now Mother Superior, marshals Chapterhouse’s resources—spice, Sheeana’s worms, and Duncan’s ghola—to counter this existential threat." },
+        { summary: "Odrade’s Strategy and Transformation", details: "Odrade accelerates Chapterhouse’s desertification to produce spice, ensuring economic leverage. She trains Sheeana to breed sandworms and plans to integrate Honored Matre tactics into the Bene Gesserit, dispatching Bellonda and Tamalane to assess vulnerabilities. Her vision balances survival with evolution, adapting Leto’s Golden Path to confront the Matres." },
+        { summary: "The Tleilaxu’s Final Gift", details: "Scytale, the last Tleilaxu Master, held captive on Chapterhouse, offers a deal: his genetic knowledge for freedom. He provides a tank to grow a new ghola, revealing the Tleilaxu’s centuries-long scheme to dominate via Duncan’s original memories. Odrade accepts, birthing Miles Teg anew, whose tactical genius becomes crucial." },
+        { summary: "Duncan and Murbella’s Bond", details: "Duncan Idaho, aboard the no-ship with Sheeana, forms a deep bond with Murbella, a captured Honored Matre trained by Lucilla. Their mutual imprinting—his ghola memories and her Matre skills—creates a hybrid power. Duncan’s visions hint at an external threat, driving his resolve to protect the sisterhood from within the ship’s confines." },
+        { summary: "The Battle for Junction", details: "Odrade lures the Honored Matres to Junction, staging a trap with Teg’s reborn brilliance. Teg, commanding from a no-ship, outmaneuvers the Matres, but Odrade sacrifices herself to provoke Murbella’s defection. Murbella kills the Matre leader, Logno, seizing control and aligning with the Bene Gesserit, though at great cost." },
+        { summary: "The Escape of the No-Ship", details: "As Junction falls into chaos, Duncan, Sheeana, Teg, and Scytale escape aboard the no-ship, fleeing into uncharted space. They carry the last sandworm, Tleilaxu cells, and a defiant vision of freedom. Their departure defies both Bene Gesserit and Matre control, hinting at a mysterious elderly couple—observers from the Scattering—watching their flight." },
+        { summary: "Murbella’s Dual Leadership", details: "Murbella merges the Bene Gesserit and Honored Matres into a unified order on Chapterhouse, blending their strengths to face the unknown enemy from the Scattering. Her leadership, tempered by Duncan’s influence, marks a new era, while the no-ship’s escape leaves an open-ended legacy for humanity’s future." }
+    ],
+    [
+        { date: "circa 15,213 AG", event: "Honored Matres escalate their attacks, targeting Bene Gesserit worlds after Rakis’ fall." },
+        { date: "circa 15,213 AG", event: "Odrade transforms Chapterhouse into a desert, initiating spice production with Sheeana’s sandworm." },
+        { date: "circa 15,213 AG", event: "Scytale offers his genetic secrets, enabling the rebirth of Miles Teg from an axlotl tank." },
+        { date: "circa 15,213 AG", event: "Duncan and Murbella’s bond deepens aboard the no-ship, unlocking mutual powers." },
+        { date: "circa 15,213 AG", event: "Teg leads a trap at Junction, Odrade dies, and Murbella assumes Matre leadership." },
+        { date: "circa 15,213 AG", event: "Duncan, Sheeana, Teg, and Scytale escape in the no-ship, vanishing into uncharted space." },
+        { date: "circa 15,213 AG", event: "Murbella unites the Bene Gesserit and Honored Matres, establishing a new order on Chapterhouse." }
+    ],
+    [
+        { name: "Darwi Odrade", role: "Mother Superior, strategist", background: "An Atreides-descended Bene Gesserit, Odrade’s pragmatic leadership evolves the sisterhood. Raised with Other Memory, she balances tradition with radical adaptation.", motivations: "Preserves the Bene Gesserit by outwitting the Honored Matres, sacrificing herself for a unified future.", developments: ["Leads Chapterhouse desertification", "Recruits Scytale", "Plans Junction trap", "Dies to secure Murbella"], relationships: { family: [], allies: ["Teg", "Sheeana", "Duncan", "Bellonda"], enemies: ["Honored Matres", "Logno"] } },
+        { name: "Sheeana Brugh", role: "Sandworm controller, visionary", background: "Rescued from Rakis, Sheeana’s ability to command worms ties her to Leto’s legacy. Trained by the Bene Gesserit, she seeks autonomy beyond their control.", motivations: "Protects the sandworm legacy while resisting manipulation, aligning with Duncan’s escape.", developments: ["Breeds worms on Chapterhouse", "Joins no-ship", "Escapes with Duncan"], relationships: { family: [], allies: ["Odrade", "Duncan", "Teg"], enemies: ["Honored Matres"] } },
+        { name: "Duncan Idaho", role: "Ghola, rebel strategist", background: "The latest ghola, Duncan’s restored memories span millennia, enriched by Tleilaxu enhancements. His visions hint at an external foe.", motivations: "Seeks freedom from control, using his bond with Murbella to defy both factions.", developments: ["Bonds with Murbella", "Sees beyond the Matres", "Leads no-ship escape"], relationships: { family: [], allies: ["Sheeana", "Teg", "Murbella"], enemies: ["Honored Matres", "Bene Gesserit (partially)"] } },
+        { name: "Miles Teg", role: "Reborn Bashar, military genius", background: "Regrown from Scytale’s tank, Teg retains his superhuman speed and prescience from Heretics. His loyalty to the sisterhood drives their defense.", motivations: "Protects the Bene Gesserit’s future, honoring Odrade’s sacrifice.", developments: ["Reborn on Chapterhouse", "Commands Junction battle", "Escapes with no-ship"], relationships: { family: [], allies: ["Odrade", "Duncan", "Sheeana"], enemies: ["Honored Matres"] } },
+        { name: "Murbella", role: "Honored Matre turned leader", background: "Captured and trained by Lucilla, Murbella’s Matre skills merge with Bene Gesserit discipline via Duncan’s imprinting, making her a hybrid power.", motivations: "Seeks power and redemption, unifying the factions after Odrade’s death.", developments: ["Imprinted by Duncan", "Kills Logno", "Leads merged order"], relationships: { family: [], allies: ["Duncan", "Odrade"], enemies: ["Logno", "Honored Matres (initially)"] } },
+        { name: "Scytale", role: "Tleilaxu Master, captive", background: "The last Tleilaxu, Scytale holds genetic secrets in his nullentropy capsule. His cunning persists despite captivity.", motivations: "Preserves Tleilaxu legacy, bargaining for freedom with Teg’s rebirth.", developments: ["Offers Teg’s rebirth", "Joins no-ship escape"], relationships: { family: [], allies: ["Duncan (tentative)"], enemies: ["Bene Gesserit", "Honored Matres"] } },
+        { name: "Bellonda", role: "Bene Gesserit archivist", background: "A stern Mentat and advisor to Odrade, Bellonda guards the sisterhood’s knowledge with ruthless efficiency.", motivations: "Ensures Bene Gesserit survival through discipline, skeptical of Odrade’s risks.", developments: ["Monitors Chapterhouse", "Assesses Matre threat", "Supports Murbella"], relationships: { family: [], allies: ["Odrade", "Tamalane"], enemies: ["Honored Matres"] } }
+    ],
+    [
+        { name: "Chapterhouse Keep", description: "A fortified Bene Gesserit stronghold amid shifting dunes, its stone walls and hidden chambers house the sisterhood’s desperate operations.", events: ["Desertification accelerates", "Teg reborn", "No-ship departs"], characters: ["Odrade", "Sheeana", "Duncan", "Teg", "Scytale"] },
+        { name: "Central (Gammu)", description: "A bleak city on Gammu, its towering buildings and narrow streets are a Bene Gesserit base infiltrated by Matre spies.", events: ["Matres probe defenses", "Bene Gesserit regroup"], characters: ["Bellonda", "Tamalane"] },
+        { name: "Junction", description: "A chaotic spaceport of vast hangars and twisting passages, Junction is the Honored Matres’ command center until Odrade’s trap.", events: ["Teg’s battle", "Odrade’s death", "Murbella’s rise"], characters: ["Odrade", "Teg", "Murbella", "Logno"] },
+        { name: "Buzzell Outpost", description: "A rocky island amid Buzzell’s stormy seas, this outpost is a soostone mine under Bene Gesserit control, raided by Matres.", events: ["Matres attack", "Bene Gesserit retreat"], characters: ["Tamalane", "Phibians"] }
+    ],
+    [
+        { name: "Survival and Resilience", description: "The Bene Gesserit’s desertification of Chapterhouse and Teg’s rebirth reflect resilience against annihilation, adapting Leto’s Golden Path to new foes." },
+        { name: "Power and Integration", description: "Murbella’s unification of Bene Gesserit and Honored Matres blends power structures, as seen in her killing of Logno, balancing dominance with cooperation." },
+        { name: "Freedom and Defiance", description: "Duncan and Sheeana’s no-ship escape defies control, echoing Leto’s vision of a free humanity, with the sandworm as a symbol of renewal." },
+        { name: "Identity and Fusion", description: "Duncan’s imprinting with Murbella and Teg’s rebirth explore identity’s melding, merging past and present to face the future." },
+        { name: "Mystery and the Unknown", description: "The elderly couple watching the no-ship hints at a hidden threat from the Scattering, leaving an unresolved enigma for humanity’s next chapter." }
+    ],
+    "Chapterhouse: Dune follows Heretics of Dune, resolving the Honored Matres conflict through Murbella’s leadership while opening new questions with the no-ship’s escape. It concludes Herbert’s saga, linking back to Leto’s Scattering and leaving a legacy of adaptation and mystery."
+);
+
+        const novels = [dune, duneMessiah, childrenOfDune, godEmperorOfDune, hereticsOfDune, chapterhouseDune];
+        const novelList = document.getElementById("novel-list");
+        novels.forEach(novel => novelList.innerHTML += novel.generateHTML());
+
+
+        // Dynamically adjust starfield height
+        window.addEventListener('resize', updateStarfieldHeight);
+        window.addEventListener('load', updateStarfieldHeight);
+        window.addEventListener('scroll', updateStarfieldHeight);
+        function updateStarfieldHeight() {
+            const starfield = document.querySelector('.starfield');
+            const dunes = document.querySelector('.dunes');
+            const bodyHeight = Math.max(document.body.scrollHeight, window.innerHeight);
+            starfield.style.height = `${bodyHeight}px`;
+            dunes.style.height = `${Math.min(bodyHeight * 0.5, window.innerHeight * 0.5)}px`;
+        }
+
+
+    </script>
+</body>
+</html>
