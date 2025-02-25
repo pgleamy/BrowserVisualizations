@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Starfield Animation - Parallax Fly-Through</title>
+  <style>
+    body { margin: 0; overflow: hidden; cursor: none;}
+    canvas { display: block; }
+    #controlPanel {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(255, 255, 255, 0.7);
+      padding: 10px;
+      border-radius: 5px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      cursor: auto;
+    }
+    #controlPanel:hover {
+      opacity: 1;
+    }
+    .control {
+      margin: 5px 0;
+    }
+    #fullscreenToggle {
+      width: 100%;
+      padding: 5px;
+      cursor: pointer;
+    }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.154.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.154.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="controlPanel">
+    <div class="control">
+      <label for="speedSlider">Speed: </label>
+      <input type="range" id="speedSlider" min="0.001" max="2" step="0.001" value="0.2">
+      <span id="speedValue">0.2</span>
+    </div>
+    <div class="control">
+      <label for="sizeSlider">Star Size: </label>
+      <input type="range" id="sizeSlider" min="3000" max="10000" step="10" value="8500">
+      <span id="sizeValue">8500</span>
+    </div>
+    <div class="control">
+      <label for="countSlider">Star Count: </label>
+      <input type="range" id="countSlider" min="1000" max="200000" step="100" value="55000">
+      <span id="countValue">55000</span>
+    </div>
+    <div class="control">
+      <label>FPS: </label>
+      <span id="fpsValue">0</span>
+    </div>
+    <div class="control">
+      <button id="fullscreenToggle">Full Screen</button>
+    </div>
+  </div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000);
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 150000);
+    camera.position.set(0, 0, 0);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.1;
+    controls.target.set(0, 0, 0);
+    controls.enablePan = false;
+    controls.enableZoom = false;
+
+    const speedSlider = document.getElementById('speedSlider');
+    const speedValueDisplay = document.getElementById('speedValue');
+    const sizeSlider = document.getElementById('sizeSlider');
+    const sizeValueDisplay = document.getElementById('sizeValue');
+    const countSlider = document.getElementById('countSlider');
+    const countValueDisplay = document.getElementById('countValue');
+    const fpsValueDisplay = document.getElementById('fpsValue'); // New FPS display element
+    const fullscreenToggle = document.getElementById('fullscreenToggle');
+
+    let starCount = parseInt(countSlider.value);
+    let positions = new Float32Array(starCount * 3);
+    let colors = new Float32Array(starCount * 3);
+    let sizes = new Float32Array(starCount);
+    const starColors = [
+      new THREE.Color(1, 1, 1),
+      new THREE.Color(0.7, 0.7, 1),
+      new THREE.Color(1, 0.7, 0.7),
+      new THREE.Color(1, 1, 0.7)
+    ];
+
+    function generateStars(count) {
+      positions = new Float32Array(count * 3);
+      colors = new Float32Array(count * 3);
+      sizes = new Float32Array(count);
+      const sizeMin = 3000;
+      const sizeMax = parseFloat(sizeSlider.value);
+      for (let i = 0; i < count; i++) {
+        positions[i * 3] = (Math.random() - 0.5) * 400000;
+        positions[i * 3 + 1] = (Math.random() - 0.5) * 400000;
+        positions[i * 3 + 2] = (Math.random() - 0.5) * 400000;
+        const color = starColors[Math.floor(Math.random() * starColors.length)];
+        colors[i * 3] = color.r;
+        colors[i * 3 + 1] = color.g;
+        colors[i * 3 + 2] = color.b;
+        sizes[i] = sizeMin + Math.random() * (sizeMax - sizeMin);
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+      geometry.setDrawRange(0, count);
+      return geometry;
+    }
+
+    let geometry = generateStars(starCount);
+
+    const vertexShader = `
+      attribute vec3 color;
+      attribute float size;
+      uniform float time;
+      uniform float sizeMultiplier;
+      varying vec2 vUv;
+      varying float vDistance;
+      varying vec3 vColor;
+      varying float vTwinkleOffset;
+
+      float noise(float t) {
+        return fract(sin(t * 12345.678) * 98765.432);
+      }
+
+      void main() {
+        vColor = color;
+        vUv = position.xy;
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        vDistance = length(mvPosition.xyz);
+        vTwinkleOffset = (position.x + position.y + position.z) * 10.0;
+        float twinkle = vDistance > 10000.0 ? 1.0 : (noise(time + vTwinkleOffset) * 0.3 + 0.7);
+        float computedSize = size * (sizeMultiplier / 8500.0) * (0.9 + twinkle * 0.2) * (200.0 / vDistance);
+        gl_PointSize = computedSize;
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `;
+
+    const fragmentShader = `
+      uniform float time;
+      varying vec2 vUv;
+      varying float vDistance;
+      varying vec3 vColor;
+      varying float vTwinkleOffset;
+
+      float noise(float t) {
+        return fract(sin(t * 54321.987) * 12345.678);
+      }
+
+      float minAngleDiff(float angle, float target) {
+        float diff = abs(angle - target);
+        return min(diff, 360.0 - diff);
+      }
+
+      void main() {
+        vec2 uv = gl_PointCoord - 0.5;
+        float dist = length(uv);
+        float core = smoothstep(0.02, 0.02 * 0.2, dist) * 2.0;
+        float aura = smoothstep(0.10, 0.10 * 0.33, dist) * 0.16;
+
+        float angle = atan(uv.y, uv.x);
+        float angleDeg = degrees(angle);
+        if (angleDeg < 0.0) angleDeg += 360.0;
+
+        float angles1[4];
+        angles1[0] = 0.0; angles1[1] = 90.0; angles1[2] = 180.0; angles1[3] = 270.0;
+        float angleDiff1 = 360.0;
+        for (int i = 0; i < 4; i++) {
+          angleDiff1 = min(angleDiff1, minAngleDiff(angleDeg, angles1[i]));
+        }
+        float armPattern1 = 1.0 - smoothstep(0.0, 10.0 / 3.5, angleDiff1);
+        float fullLength = 0.05 * 70.0 / 20.0;
+        float armFalloff1 = smoothstep(fullLength, fullLength * 0.8, dist);
+        float blaze1 = armPattern1 * armFalloff1 * 0.18 * (angleDeg < 45.0 || angleDeg > 315.0 ? 1.5 : 1.0);
+
+        float angles2[4];
+        angles2[0] = 45.0; angles2[1] = 135.0; angles2[2] = 225.0; angles2[3] = 315.0;
+        float angleDiff2 = 360.0;
+        for (int i = 0; i < 4; i++) {
+          angleDiff2 = min(angleDiff2, minAngleDiff(angleDeg, angles2[i]));
+        }
+        float armPattern2 = 1.0 - smoothstep(0.0, 10.0 / 3.5, angleDiff2);
+        float halfLength = fullLength * 0.5;
+        float armFalloff2 = smoothstep(halfLength, halfLength * 0.8, dist);
+        float blaze2 = armPattern2 * armFalloff2 * 0.18;
+
+        float blaze = max(blaze1, blaze2);
+
+        float twinkle = (noise(time * 0.9 + vTwinkleOffset) * 0.3 + 0.7);
+        float brightness = 5.0 * (100000.0 / (vDistance + 100.0));
+        float distanceAlpha = vDistance > 10000.0 ? 1.0 : (1.0 - clamp(vDistance / 100000.0, 0.0, 1.0));
+        float alpha = (core + aura + blaze) * twinkle * distanceAlpha;
+        gl_FragColor = vec4(vColor * brightness, clamp(alpha, 0.0, 1.0));
+      }
+    `;
+
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        time: { value: 0 },
+        sizeMultiplier: { value: parseFloat(sizeSlider.value) }
+      },
+      vertexShader,
+      fragmentShader,
+      blending: THREE.AdditiveBlending,
+      depthTest: true,
+      depthWrite: false,
+      transparent: true
+    });
+
+    let starField = new THREE.Points(geometry, material);
+    scene.add(starField);
+
+    let lastTime = performance.now();
+    let frameCount = 0;
+    let lastFpsTime = performance.now();
+
+    speedSlider.addEventListener('input', () => {
+      const speedFactor = parseFloat(speedSlider.value);
+      speedValueDisplay.textContent = speedFactor.toFixed(1);
+    });
+
+    sizeSlider.addEventListener('input', () => {
+      const sizeFactor = parseFloat(sizeSlider.value);
+      material.uniforms.sizeMultiplier.value = sizeFactor;
+      sizeValueDisplay.textContent = sizeFactor;
+    });
+
+    countSlider.addEventListener('input', () => {
+      const newCount = parseInt(countSlider.value);
+      countValueDisplay.textContent = newCount;
+      if (newCount !== starCount) {
+        starCount = newCount;
+        scene.remove(starField);
+        geometry.dispose();
+        geometry = generateStars(starCount);
+        starField = new THREE.Points(geometry, material);
+        scene.add(starField);
+      }
+    });
+
+    fullscreenToggle.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().then(() => {
+          fullscreenToggle.textContent = 'Exit Full Screen';
+        }).catch(err => {
+          console.error('Error entering full screen:', err);
+        });
+      } else {
+        document.exitFullscreen().then(() => {
+          fullscreenToggle.textContent = 'Full Screen';
+        }).catch(err => {
+          console.error('Error exiting full screen:', err);
+        });
+      }
+    });
+
+    const frustum = new THREE.Frustum();
+
+    function updateStarField(deltaTime) {
+      const positions = starField.geometry.attributes.position.array;
+      const sizes = starField.geometry.attributes.size.array;
+      const cameraDirection = new THREE.Vector3();
+      camera.getWorldDirection(cameraDirection);
+
+      const baseSpeed = 1000000000;
+      const speedMultiplier = parseFloat(speedSlider.value);
+      const sizeMin = 3000;
+      const sizeMax = parseFloat(sizeSlider.value);
+
+      camera.updateMatrixWorld();
+      frustum.setFromProjectionMatrix(
+        new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
+      );
+
+      for (let i = 0; i < starCount * 3; i += 3) {
+        const starPosition = new THREE.Vector3(positions[i], positions[i + 1], positions[i + 2]);
+        if (frustum.containsPoint(starPosition)) {
+          const dx = positions[i] - camera.position.x;
+          const dy = positions[i + 1] - camera.position.y;
+          const dz = positions[i + 2] - camera.position.z;
+          const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+          const speed = (baseSpeed * speedMultiplier) / (distance + 1);
+          positions[i] -= cameraDirection.x * speed * deltaTime;
+          positions[i + 1] -= cameraDirection.y * speed * deltaTime;
+          positions[i + 2] -= cameraDirection.z * speed * deltaTime;
+        }
+
+        if (speedMultiplier > 0 && !frustum.containsPoint(new THREE.Vector3(positions[i], positions[i + 1], positions[i + 2]))) {
+          const resetDistance = 100000;
+          const resetPosition = camera.position.clone().add(cameraDirection.clone().multiplyScalar(resetDistance));
+          positions[i] = resetPosition.x + (Math.random() - 0.5) * 1000000;
+          positions[i + 1] = resetPosition.y + (Math.random() - 0.5) * 1000000;
+          positions[i + 2] = resetPosition.z + (Math.random() - 0.5) * 1000000;
+          sizes[i / 3] = sizeMin + Math.random() * (sizeMax - sizeMin);
+        }
+      }
+
+      starField.geometry.attributes.position.needsUpdate = true;
+      starField.geometry.attributes.size.needsUpdate = true;
+      material.uniforms.time.value += deltaTime;
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const currentTime = performance.now();
+      let deltaTime = (currentTime - lastTime) / 1000;
+      if (deltaTime > 0.1) deltaTime = 0.016;
+      lastTime = currentTime;
+
+      // FPS calculation
+      frameCount++;
+      if (currentTime - lastFpsTime >= 1000) {
+        const fps = Math.round(frameCount * 1000 / (currentTime - lastFpsTime));
+        fpsValueDisplay.textContent = fps;
+        frameCount = 0;
+        lastFpsTime = currentTime;
+      }
+
+      updateStarField(deltaTime);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    function onResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    window.addEventListener('resize', onResize);
+    window.addEventListener('focus', () => {
+      lastTime = performance.now();
+      lastFpsTime = performance.now(); // Reset FPS timer on focus
+      frameCount = 0;
+    });
+    document.addEventListener('fullscreenchange', onResize);
+  </script>
+</body>
+</html>
