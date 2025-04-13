@@ -1,0 +1,2632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Z10 Plotting Calculator</title>
+    <meta
+        http-equiv="Content-Security-Policy"
+        content="
+            default-src 'self';
+            script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline' 'unsafe-eval';
+            style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+            img-src 'self' data: https:;
+            connect-src 'self';
+            frame-src 'none';
+        "
+    />
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.154.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.154.0/examples/jsm/"
+            }
+        }
+    </script>
+
+
+
+
+<style>
+    body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        background: linear-gradient(135deg, #0d1b2a, #1b263b, #415a77);
+        margin: 0;
+        font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    .container {
+        display: flex;
+        flex-direction: row;
+        gap: 15px;
+        align-items: stretch;
+    }
+    .calculator {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        padding: 15px;
+        border-radius: 15px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        width: 410px;
+	height: 530px;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+    }
+    .display {
+        width: 100%;
+        height: 120px;
+        background: #d7c79e;
+        backdrop-filter: blur(5px);
+        margin-bottom: 15px;
+        padding: 10px;
+        box-sizing: border-box;
+        text-align: right;
+        font-size: 13px;
+        color: #000000;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 8px;
+        resize: none;
+        overflow-x: auto;
+        overflow-y: auto;
+        white-space: pre-wrap;
+    }
+    .buttons {
+        display: grid;
+        grid-template-columns: repeat(8, 42px);
+        grid-template-rows: repeat(8, 42px);
+        gap: 6px;
+        width: 371px;
+        box-sizing: border-box;
+    }
+    button {
+        width: 42px;
+        height: 42px;
+        font-size: 14px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.1s ease;
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(5px);
+        color: #ffffff;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    /* Hover lightness handled by class-specific gradients */
+}
+.number { 
+    background: linear-gradient(135deg, rgba(100, 100, 100, 0.8), rgba(150, 150, 150, 0.7)); 
+}
+.number:hover { 
+    background: linear-gradient(135deg, rgba(120, 120, 120, 0.9), rgba(170, 170, 170, 0.8)); /* Lighter gray */
+}
+.operator { 
+    background: linear-gradient(135deg, rgba(255, 149, 0, 0.8), rgba(255, 200, 100, 0.7)); 
+}
+.operator:hover { 
+    background: linear-gradient(135deg, rgba(255, 169, 20, 0.9), rgba(255, 220, 120, 0.8)); /* Lighter orange */
+}
+.function { 
+    background: linear-gradient(135deg, rgba(74, 144, 226, 0.8), rgba(120, 180, 255, 0.7)); 
+}
+.function:hover { 
+    background: linear-gradient(135deg, rgba(94, 164, 246, 0.9), rgba(140, 200, 255, 0.8)); /* Lighter blue */
+}
+.clear { 
+    background: linear-gradient(135deg, rgba(211, 47, 47, 0.8), rgba(255, 100, 100, 0.7)); 
+}
+.clear:hover { 
+    background: linear-gradient(135deg, rgba(231, 67, 67, 0.9), rgba(255, 120, 120, 0.8)); /* Lighter red */
+}
+.equals { 
+    background: linear-gradient(135deg, rgba(46, 204, 113, 0.8), rgba(100, 255, 150, 0.7)); 
+}
+.equals:hover { 
+    background: linear-gradient(135deg, rgba(66, 224, 133, 0.9), rgba(120, 255, 170, 0.8)); /* Lighter green */
+}
+.plot { 
+    background: linear-gradient(135deg, rgba(156, 39, 176, 0.8), rgba(200, 100, 255, 0.7)); 
+}
+.plot:hover { 
+    background: linear-gradient(135deg, rgba(176, 59, 196, 0.9), rgba(220, 120, 255, 0.8)); /* Lighter purple */
+}
+    #clearBtn, #backspaceBtn, #plotBtn, #resetViewBtn, #saveBtn, #traceBtn {
+        font-size: 11px; /* Restored from original */
+    }
+    #exportCSVBtn, #renderBtn, #clearBtn {
+        font-size: 9px; /* Smaller text for these specific buttons */
+    }
+    .number { background: linear-gradient(135deg, rgba(100, 100, 100, 0.3), rgba(150, 150, 150, 0.8)); }
+    .operator { background: linear-gradient(135deg, rgba(255, 149, 0, 0.4), rgba(255, 200, 100, 0.8)); }
+    .function { background: linear-gradient(135deg, rgba(74, 144, 226, 0.4), rgba(120, 180, 255, 0.8)); }
+    .clear { background: linear-gradient(135deg, rgba(211, 47, 47, 0.4), rgba(255, 100, 100, 0.8)); }
+    .equals { background: linear-gradient(135deg, rgba(46, 204, 113, 0.4), rgba(100, 255, 150, 0.8)); }
+    .plot { background: linear-gradient(135deg, rgba(156, 39, 176, 0.4), rgba(200, 100, 255, 0.8)); }
+    #plotArea {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        position: relative;
+        align-items: flex-start;
+    }
+    #graphContainer {
+        width: 360px;
+        height: 360px;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(10px);
+        border-radius: 15px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        position: relative;
+        overflow: hidden;
+        cursor: none;
+    }
+    #graphContainer canvas {
+        width: 100% !important;
+        height: 100% !important;
+        border-radius: 15px;
+    }
+    #crosshair {
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        pointer-events: none;
+        z-index: 1;
+    }
+    #crosshair::before, #crosshair::after {
+        content: '';
+        position: absolute;
+        background: rgba(255, 255, 255, 0.8);
+        top: 50%;
+        left: 50%;
+    }
+    #crosshair::before {
+        width: 1px;
+        height: 20px;
+        transform: translate(-50%, -50%);
+    }
+    #crosshair::after {
+        width: 20px;
+        height: 1px;
+        transform: translate(-50%, -50%);
+    }
+
+
+
+
+#equationList {
+    width: 350px;
+    height: 530px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    padding: 10px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 10px;
+    color: #ffffff;
+    box-sizing: border-box;
+}
+.equation-group {
+    margin-bottom: 5px;
+}
+.group-header {
+    font-weight: bold;
+    padding: 5px;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 5px;
+    cursor: pointer;
+}
+.group-header:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+.toggle-icon {
+    display: inline-block;
+    width: 15px;
+    text-align: center;
+}
+.group-content {
+    display: block; /* Initially visible */
+}
+.equation-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.05);
+    margin-bottom: 2px;
+    border-radius: 5px;
+    min-height: 20px;
+}
+.equation-item:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+.equation-item span {
+    flex: 1;
+    white-space: normal;
+    overflow-wrap: break-word;
+    max-width: calc(100% - 60px);
+    margin-right: 10px;
+    cursor: pointer;
+    line-height: 1.2;
+}
+.equation-item button {
+    flex-shrink: 0;
+    width: 50px;
+    height: 20px;
+    font-size: 9px;
+    background: linear-gradient(135deg, rgba(211, 47, 47, 0.4), rgba(255, 100, 100, 0.2));
+    color: #ffffff;
+    padding: 0;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+#equationList::-webkit-scrollbar {
+    width: 10px;
+}
+#equationList::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+}
+#equationList::-webkit-scrollbar-thumb {
+    background: rgba(0, 102, 204, 0.5);
+    border-radius: 5px;
+}
+#equationList::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 77, 153, 0.7);
+}
+#equationList {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 102, 204, 0.5) rgba(255, 255, 255, 0.1);
+}
+
+
+
+
+
+
+    #exportBtn {
+        background: linear-gradient(135deg, rgba(33, 150, 243, 0.4), rgba(100, 200, 255, 0.2));
+        color: #ffffff;
+        padding: 5px 10px;
+        font-size: 14px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    #exportBtn:hover {
+        background: linear-gradient(135deg, rgba(33, 150, 243, 0.6), rgba(100, 200, 255, 0.4));
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    }
+
+
+
+#sliders {
+    width: 360px;
+    height: 150px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 113px); /* Dynamic columns, 113px each */
+    grid-template-rows: repeat(5, 30px); /* Fixed 5 rows, 30px each */
+    gap: 0;
+    margin-top: 5px;
+    padding: 5px;
+    box-sizing: border-box;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    white-space: nowrap; /* Ensure horizontal layout */
+}
+.slider-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 113px; /* Matches column width */
+    height: 30px; /* Fits label + slider in row */
+}
+.slider-container label {
+    font-size: 9px;
+    width: auto;
+    color: #ffffff;
+    margin-bottom: 2px;
+    text-align: center;
+}
+.slider-container input[type="range"] {
+    width: 105px; /* Fits within 113px with small margin */
+    height: 5px;
+    margin: 0;
+    padding: 0;
+    -webkit-appearance: none;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.slider-container input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px;
+    height: 10px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+#sliders::-webkit-scrollbar {
+    height: 8px;
+}
+#sliders::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+}
+#sliders::-webkit-scrollbar-thumb {
+    background: rgba(0, 102, 204, 0.5);
+    border-radius: 4px;
+}
+#sliders::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 77, 153, 0.7);
+}
+#sliders {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 102, 204, 0.5) rgba(255, 255, 255, 0.1);
+}
+
+
+</style>
+
+
+</head>
+<body>
+<div class="container">
+    <div id="plotArea">
+        <div id="graphContainer"></div>
+        
+        <div id="sliders"></div>
+    </div>
+    <div class="calculator">
+        <textarea class="display" id="display"></textarea>
+        <div class="buttons" id="buttons">
+            
+            <button style="grid-column: 1; grid-row: 1;" class="function" data-value="sin(">sin</button>
+            <button style="grid-column: 2; grid-row: 1;" class="function" data-value="cos(">cos</button>
+            <button style="grid-column: 3; grid-row: 1;" class="function" data-value="tan(">tan</button>
+            <button style="grid-column: 4; grid-row: 1;" class="function" data-value="sqrt(">√</button>
+            <button style="grid-column: 5; grid-row: 1;" class="function" data-value="abs(">|<i>x</i>|</button>
+            <button style="grid-column: 6; grid-row: 1;" class="function" data-value="sign(">sgn</button>
+            <button style="grid-column: 7; grid-row: 1;" class="function" data-value="log(">log</button>
+            <button style="grid-column: 8; grid-row: 1;" class="function" data-value="ln(">ln</button>
+
+            
+            <button style="grid-column: 1; grid-row: 2;" class="function" data-value="exp(">eˣ</button>
+            <button style="grid-column: 2; grid-row: 2;" class="function" data-value="(">(</button>
+            <button style="grid-column: 3; grid-row: 2;" class="function" data-value=")">)</button>
+            <button style="grid-column: 4; grid-row: 2;" class="function" data-value="%">%</button>
+            <button style="grid-column: 5; grid-row: 2;" class="function" data-value="x">x</button>
+            <button style="grid-column: 6; grid-row: 2;" class="function" data-value="y">y</button>
+            <button style="grid-column: 7; grid-row: 2;" class="function" data-value="z">z</button>
+            <button style="grid-column: 8; grid-row: 2;" class="function" data-value="t">t</button>
+
+            
+            <button style="grid-column: 1; grid-row: 3;" class="function" data-value="u">u</button>
+            <button style="grid-column: 2; grid-row: 3;" class="function" data-value="t1">t₁</button>
+            <button style="grid-column: 3; grid-row: 3;" class="function" data-value="Math.PI">π</button>
+            <button style="grid-column: 4; grid-row: 3;" class="function" data-value="Math.PI/2">π/2</button>
+            <button style="grid-column: 5; grid-row: 3;" class="function" data-value="=">=</button>
+            <button style="grid-column: 3; grid-row: 4;" class="number" data-value="7">7</button>
+            <button style="grid-column: 4; grid-row: 4;" class="number" data-value="8">8</button>
+            <button style="grid-column: 5; grid-row: 4;" class="number" data-value="9">9</button>
+
+           
+            <button style="grid-column: 3; grid-row: 5;" class="number" data-value="4">4</button>
+            <button style="grid-column: 4; grid-row: 5;" class="number" data-value="5">5</button>
+            <button style="grid-column: 5; grid-row: 5;" class="number" data-value="6">6</button>
+
+            
+            <button style="grid-column: 3; grid-row: 6;" class="number" data-value="1">1</button>
+            <button style="grid-column: 4; grid-row: 6;" class="number" data-value="2">2</button>
+            <button style="grid-column: 5; grid-row: 6;" class="number" data-value="3">3</button>
+
+           
+            <button style="grid-column: 6; grid-row: 4;" class="operator" data-value="/">÷</button>
+            <button style="grid-column: 7; grid-row: 4;" class="operator" data-value="*">×</button>
+            <button style="grid-column: 8; grid-row: 4;" class="operator" data-value="^">xʸ</button>
+            <button style="grid-column: 6; grid-row: 5;" class="operator" data-value="-">-</button>
+            <button style="grid-column: 7; grid-row: 5;" class="operator" data-value="+">+</button>
+            <button style="grid-column: 6; grid-row: 6;" class="number" data-value="0">0</button>
+            <button style="grid-column: 7; grid-row: 6;" class="number" data-value=".">.</button>
+
+           
+            <button style="grid-column: 1; grid-row: 4;" class="function" data-value="range+">R+</button>
+            <button style="grid-column: 2; grid-row: 4;" class="function" data-value="range-">R-</button>
+            <button style="grid-column: 1; grid-row: 5;" class="function" data-value="step+">St+</button>
+            <button style="grid-column: 2; grid-row: 5;" class="function" data-value="step-">St-</button>
+           <button style="grid-column: 1; grid-row: 6;" class="function" data-value="stepU+">Su+</button>
+           <button style="grid-column: 2; grid-row: 6;" class="function" data-value="stepU-">Su-</button>
+
+           
+            <button style="grid-column: 6; grid-row: 3;" class="clear" id="clearBtn">CLEAR</button>
+            <button style="grid-column: 7; grid-row: 3;" class="clear" id="backspaceBtn">DEL</button>
+            <button style="grid-column: 8; grid-row: 3;" class="plot" id="plotBtn">PLOT</button>
+            <button style="grid-column: 8; grid-row: 5;" class="equals" id="equalsBtn" data-value="=">=</button>
+            <button style="grid-column:1;grid-row:7;"class="plot" id="exportBtn">png</button>
+	    <button style="grid-column: 2; grid-row: 7;" class="function" id="resetViewBtn">Reset</button>
+	    <button style="grid-column: 3; grid-row: 7;" class="function" id="saveBtn">Save</button>
+	         <button style="grid-column: 4; grid-row: 7;" class="function" id="traceBtn">Trace</button>
+	         <button style="grid-column: 5; grid-row: 7;" class="plot" id="exportCSVBtn">CSV</button>
+	        <button style="grid-column: 6; grid-row: 7;" class="plot" id="renderBtn">Render</button>
+        </div>
+    </div>
+    <div id="equationList"></div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+    import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+    import { Line2 } from 'three/addons/lines/Line2.js';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+    import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
+
+    const display = document.getElementById('display');
+    const equationList = document.getElementById('equationList');
+    let scene, camera, renderer, mesh, controls, composer, fxaaPass;
+    let storedEquations = JSON.parse(localStorage.getItem('storedEquations')) || [];
+    let isAnimating = false;
+    let range = 6, step = 0.1;
+    let rangeU = 6, stepU = 0.1;
+    let intersectionMarker;
+    let currentParams = {};
+    let isSliderUpdate = false;
+    let originalEquation = '';
+
+
+    let isTracing = false; // Tracks if trace mode is active
+    let tracePositions = []; // Stores the current plot’s positions array
+    let traceIndex = 0; // Current position index in tracePositions
+
+    let plotPositions = [];
+
+    let wireframeGeometry = null;  // Store wireframe geometry
+    let wireframeMaterial = null;  // Store wireframe material
+    let isRendered = false;        // Track render state
+
+
+   
+
+
+
+
+
+
+function renderSurface() {
+    if (!display.value || !plotPositions.length) {
+        console.log('No equation or plot to render');
+        return;
+    }
+
+    const renderBtn = document.getElementById('renderBtn');
+    if (isRendered) {
+        // Switch back to wireframe
+        if (mesh) {
+            scene.remove(mesh);
+            mesh.geometry.dispose();
+            mesh.material.dispose();
+        }
+        if (wireframeGeometry && wireframeMaterial) {
+            mesh = new Line2(wireframeGeometry.clone(), wireframeMaterial.clone());
+            mesh.computeLineDistances();
+            scene.add(mesh);
+            isRendered = false;
+            renderBtn.textContent = 'Render';
+            composer.render();
+        } else {
+            console.log('Wireframe data not available');
+        }
+        return;
+    }
+
+    // Switch to shaded surface
+    try {
+        const equation = display.value.replace(/\s+/g, '');
+        const is3DY = equation.includes('y=');
+        const is3DZ = equation.includes('z=');
+        const isImplicit = equation.includes('=') && !is3DY && !is3DZ;
+        const isParametric = equation.includes('x(t)') || equation.includes('y(t)') || equation.includes('z(t)');
+
+        const n_t = 500;
+        const n_u = 500;
+        const vertices = new Float32Array(n_t * n_u * 3);
+        const indices = [];
+
+        if (isParametric) {
+            const parts = equation.split(',').map(s => s.trim());
+            if (parts.length !== 3) throw new Error('Parametric equations must have x(t,u), y(t,u), z(t,u)');
+
+            let xExpr = parts[0].replace(/x\(t\)=|x\(t,u\)=|x\(t,t1\)=/gi, '').trim();
+            let yExpr = parts[1].replace(/y\(t\)=|y\(t,u\)=|y\(t,t1\)=/gi, '').trim();
+            let zExpr = parts[2].replace(/z\(t\)=|z\(t,u\)=|z\(t,t1\)=/gi, '').trim();
+
+            const hasU = xExpr.includes('u') || yExpr.includes('u') || zExpr.includes('u') ||
+                         xExpr.includes('t1') || yExpr.includes('t1') || zExpr.includes('t1');
+            if (!hasU) throw new Error('Single-line parametric equations are not supported for surface rendering');
+
+            xExpr = xExpr.replace(/(?<!Math\.)sin\(/gi, 'Math.sin(')
+                         .replace(/(?<!Math\.)cos\(/gi, 'Math.cos(')
+                         .replace(/(?<!Math\.)tan\(/gi, 'Math.tan(')
+                         .replace(/(?<!Math\.)sqrt\(/gi, 'Math.sqrt(')
+                         .replace('^', '**')
+                         .replace(/t1/g, 'u');
+            yExpr = yExpr.replace(/(?<!Math\.)sin\(/gi, 'Math.sin(')
+                         .replace(/(?<!Math\.)cos\(/gi, 'Math.cos(')
+                         .replace(/(?<!Math\.)tan\(/gi, 'Math.tan(')
+                         .replace(/(?<!Math\.)sqrt\(/gi, 'Math.sqrt(')
+                         .replace('^', '**')
+                         .replace(/t1/g, 'u');
+            zExpr = zExpr.replace(/(?<!Math\.)sin\(/gi, 'Math.sin(')
+                         .replace(/(?<!Math\.)cos\(/gi, 'Math.cos(')
+                         .replace(/(?<!Math\.)tan\(/gi, 'Math.tan(')
+                         .replace(/(?<!Math\.)sqrt\(/gi, 'Math.sqrt(')
+                         .replace('^', '**')
+                         .replace(/t1/g, 'u');
+
+            const xFunc = new Function('t', 'u', `return ${xExpr}`);
+            const yFunc = new Function('t', 'u', `return ${yExpr}`);
+            const zFunc = new Function('t', 'u', `return ${zExpr}`);
+
+            const tMin = -range, tMax = range;
+            const uMin = -rangeU, uMax = rangeU;
+            for (let u_idx = 0; u_idx < n_u; u_idx++) {
+                const u = uMin + (uMax - uMin) * u_idx / (n_u - 1);
+                for (let t_idx = 0; t_idx < n_t; t_idx++) {
+                    const t = tMin + (tMax - tMin) * t_idx / (n_t - 1);
+                    const x = xFunc(t, u);
+                    const y = yFunc(t, u);
+                    const z = zFunc(t, u);
+                    const idx = u_idx * n_t + t_idx;
+                    vertices[idx * 3] = isFinite(x) ? x : 0;
+                    vertices[idx * 3 + 1] = isFinite(y) ? y : 0;
+                    vertices[idx * 3 + 2] = isFinite(z) ? z : 0;
+                }
+            }
+            for (let u = 0; u < n_u - 1; u++) {
+                for (let t = 0; t < n_t - 1; t++) {
+                    const a = u * n_t + t;
+                    const b = a + 1;
+                    const c = (u + 1) * n_t + t;
+                    const d = c + 1;
+                    indices.push(a, b, d);
+                    indices.push(a, d, c);
+                }
+            }
+        } else if (is3DY || is3DZ || 
+                   (equation.includes('x') && equation.includes('y') && !equation.includes('z')) || 
+                   (equation.includes('x') && equation.includes('z') && !equation.includes('y')) || 
+                   (equation.includes('y') && equation.includes('z') && !equation.includes('x'))) {
+            let expr = equation;
+            if (is3DY) expr = expr.split('y=')[1];
+            else if (is3DZ) expr = expr.split('z=')[1];
+
+            expr = expr.replace(/(?<!Math\.)sin\(/gi, 'Math.sin(')
+                       .replace(/(?<!Math\.)cos\(/gi, 'Math.cos(')
+                       .replace(/(?<!Math\.)tan\(/gi, 'Math.tan(')
+                       .replace(/(?<!Math\.)sqrt\(/gi, 'Math.sqrt(')
+                       .replace('^', '**');
+
+            let func, xAxis, yAxis, zAxis;
+            if (is3DY || (equation.includes('x') && equation.includes('z') && !equation.includes('y'))) {
+                func = new Function('x', 'z', `return ${expr}`);
+                xAxis = 'x';
+                yAxis = 'y';
+                zAxis = 'z';
+            } else if (is3DZ || (equation.includes('x') && equation.includes('y') && !equation.includes('z'))) {
+                func = new Function('x', 'y', `return ${expr}`);
+                xAxis = 'x';
+                yAxis = 'y';
+                zAxis = 'z';
+            } else {
+                func = new Function('y', 'z', `return ${expr}`);
+                xAxis = 'x';
+                yAxis = 'y';
+                zAxis = 'z';
+            }
+
+            const xMin = -range, xMax = range;
+            const yMin = -range, yMax = range;
+            const zMin = -range, zMax = range;
+            for (let u_idx = 0; u_idx < n_u; u_idx++) {
+                for (let t_idx = 0; t_idx < n_t; t_idx++) {
+                    let x, y, z;
+                    if (yAxis === 'y' && zAxis === 'z' && xAxis === 'x' && !is3DY && !is3DZ) {
+                        x = xMin + (xMax - xMin) * t_idx / (n_t - 1);
+                        y = yMin + (yMax - yMin) * u_idx / (n_u - 1);
+                        z = func(x, y);
+                    } else if (xAxis === 'x' && yAxis === 'y' && zAxis === 'z' && is3DY) {
+                        x = xMin + (xMax - xMin) * t_idx / (n_t - 1);
+                        z = zMin + (zMax - zMin) * u_idx / (n_u - 1);
+                        y = func(x, z);
+                    } else {
+                        y = yMin + (yMax - yMin) * t_idx / (n_t - 1);
+                        z = zMin + (zMax - zMin) * u_idx / (n_u - 1);
+                        x = func(y, z);
+                    }
+                    const idx = u_idx * n_t + t_idx;
+                    vertices[idx * 3] = isFinite(x) ? x : 0;
+                    vertices[idx * 3 + 1] = isFinite(y) ? y : 0;
+                    vertices[idx * 3 + 2] = isFinite(z) ? z : 0;
+                }
+            }
+            for (let u = 0; u < n_u - 1; u++) {
+                for (let t = 0; t < n_t - 1; t++) {
+                    const a = u * n_t + t;
+                    const b = a + 1;
+                    const c = (u + 1) * n_t + t;
+                    const d = c + 1;
+                    indices.push(a, b, d);
+                    indices.push(a, d, c);
+                }
+            }
+        } else if (isImplicit) {
+            throw new Error('Implicit equations are not supported for surface rendering');
+        } else {
+            throw new Error('Unsupported equation type');
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals();
+
+        const material = new THREE.MeshPhongMaterial({
+            color: 0xcccccc,
+            side: THREE.DoubleSide,
+            shininess: 50
+        });
+        const surfaceMesh = new THREE.Mesh(geometry, material);
+        surfaceMesh.castShadow = true;
+        surfaceMesh.receiveShadow = true;
+
+        if (mesh) {
+            scene.remove(mesh);
+            mesh.geometry.dispose();
+            mesh.material.dispose();
+        }
+        mesh = surfaceMesh;
+        scene.add(mesh);
+        isRendered = true;
+        renderBtn.textContent = 'Wire';
+        composer.render();
+    } catch (error) {
+        console.error('Render error:', error);
+        const originalValue = display.value;
+        display.value = `Error: ${error.message}`;
+        setTimeout(() => { display.value = originalValue; }, 2000);
+    }
+}
+
+
+
+
+
+
+
+
+
+// TRACE Functions
+function enableTraceMode() {
+    if (!mesh || !tracePositions.length) {
+        console.log('No plot available to trace');
+        return;
+    }
+    if (isTracing) {
+        disableTraceMode();
+        return;
+    }
+
+    if (tracePositions.length < 3) {
+        console.log('Plot has insufficient points for tracing');
+        return;
+    }
+
+    const equation = display.value.trim();
+    const is3D = equation.includes('y=') || equation.includes('z=') || (equation.includes('x') && equation.includes('y'));
+    const isParametric = equation.includes('x(t)') || equation.includes('y(t)') || equation.includes('z(t)');
+
+    if (is3D && !isParametric) {
+        const pointsPerRow = Math.floor(2 * range / step) + 1;
+        const newTracePositions = [];
+        let foundStart = false;
+        for (let i = 0; i < tracePositions.length; i += 6) {
+            const x1 = tracePositions[i];
+            const y1 = tracePositions[i + 1];
+            const z1 = tracePositions[i + 2];
+            const x2 = tracePositions[i + 3];
+            const y2 = tracePositions[i + 4];
+            const z2 = tracePositions[i + 5];
+            if (Math.abs(z1 - (-range)) < 0.01 && z1 === z2) {
+                newTracePositions.push(x1, y1, z1, x2, y2, z2);
+                foundStart = true;
+            } else if (foundStart && Math.abs(z1 - (-range)) > 0.01) {
+                break;
+            }
+        }
+        tracePositions = newTracePositions;
+    }
+
+    if (tracePositions.length < 6) {
+        console.log('Insufficient points after reorganization for tracing');
+        disableTraceMode();
+        return;
+    }
+
+    isTracing = true;
+    traceIndex = 0;
+    updateTraceMarker();
+    console.log('Trace mode enabled with', tracePositions.length / 3, 'points');
+}
+
+function disableTraceMode() {
+    isTracing = false;
+    intersectionMarker.visible = false;
+    const traceDisplay = document.querySelector('#graphContainer div:nth-child(3)'); // Second div after crosshair
+    if (traceDisplay) {
+        traceDisplay.textContent = '';
+    }
+    console.log('Trace mode disabled');
+}
+
+function updateTraceMarker() {
+    if (!isTracing || traceIndex < 0 || traceIndex >= tracePositions.length / 3) return;
+
+    const x = tracePositions[traceIndex * 3];
+    const y = tracePositions[traceIndex * 3 + 1];
+    const z = tracePositions[traceIndex * 3 + 2];
+    intersectionMarker.position.set(x, y, z);
+    intersectionMarker.visible = true;
+
+    const distance = camera.position.distanceTo(intersectionMarker.position);
+    const scale = 0.02 * distance;
+    intersectionMarker.scale.set(scale, scale, 1);
+
+    const traceDisplay = document.querySelector('#graphContainer div:nth-child(3)');
+    if (traceDisplay) {
+        traceDisplay.textContent = `TRACE: x: ${x.toFixed(2)}, y: ${y.toFixed(2)}, z: ${z.toFixed(2)}`;
+    }
+
+    composer.render();
+}
+
+function traceNext() {
+    if (!isTracing) return;
+    traceIndex = Math.min(traceIndex + 1, Math.floor(tracePositions.length / 3) - 1);
+    updateTraceMarker();
+}
+
+function tracePrevious() {
+    if (!isTracing) return;
+    traceIndex = Math.max(traceIndex - 1, 0);
+    updateTraceMarker();
+}
+
+
+
+
+
+
+function addScaleMarkers(axis, rangeValue, color, minorStep = 1) {
+    const minorMaterial = new THREE.LineBasicMaterial({ color: color, opacity: 1.0, transparent: false });
+    const majorMaterial = new THREE.LineBasicMaterial({ color: color, opacity: 1.0, transparent: false });
+    const minorTickLength = 0.25;
+    const majorTickLength = 0.5;
+    const majorStep = rangeValue >= 10 ? 10 : rangeValue >= 5 ? 5 : 2;
+
+    function createNumberSprite(text) {
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = 128; // Higher resolution
+        canvas.height = 128;
+        context.font = 'Bold 80px Arial'; // Scaled font
+        context.fillStyle = '#d3d3d3'; // Light gray
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(text, 64, 64); // Center in canvas
+        const texture = new THREE.CanvasTexture(canvas);
+        const material = new THREE.SpriteMaterial({ map: texture });
+        const sprite = new THREE.Sprite(material);
+        sprite.scale.set(0.55, 0.55, 1); // Adjusted scale
+        return sprite;
+    }
+
+    for (let i = -rangeValue; i <= rangeValue; i += minorStep) {
+        if (i === 0) continue; // Skip origin
+        const isMajor = i % majorStep === 0;
+        const tickLength = isMajor ? majorTickLength : minorTickLength;
+        const material = isMajor ? majorMaterial : minorMaterial;
+
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(6);
+
+        if (axis === 'x') {
+            positions[0] = i; positions[1] = -tickLength / 2; positions[2] = 0;
+            positions[3] = i; positions[4] = tickLength / 2;  positions[5] = 0;
+        } else if (axis === 'y') {
+            positions[0] = -tickLength / 2; positions[1] = i; positions[2] = 0;
+            positions[3] = tickLength / 2;  positions[4] = i; positions[5] = 0;
+        } else if (axis === 'z') {
+            positions[0] = 0; positions[1] = -tickLength / 2; positions[2] = i;
+            positions[3] = 0; positions[4] = tickLength / 2;  positions[5] = i;
+        }
+
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const tick = new THREE.Line(geometry, material);
+        tick.userData = { type: 'tick' };
+        scene.add(tick);
+
+        if (isMajor) {
+            const numberSprite = createNumberSprite(i.toString());
+            if (axis === 'x') {
+                numberSprite.position.set(i, -majorTickLength - 0.02 , 0); // Adjusted offset
+            } else if (axis === 'y') {
+                numberSprite.position.set(-majorTickLength - 0.02, i, 0); // Adjusted offset
+            } else if (axis === 'z') {
+                numberSprite.position.set(0, -majorTickLength  - 0.02, i); // Adjusted offset
+            }
+            numberSprite.userData = { type: 'numberSprite' };
+            scene.add(numberSprite);
+        }
+    }
+}
+
+
+
+
+
+
+
+function initThreeJS() {
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(75, 1, 0.01, 10000);
+    renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    renderer.setSize(360, 360);
+    renderer.setClearColor(0x000000, 1);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    const graphContainer = document.getElementById('graphContainer');
+    graphContainer.appendChild(renderer.domElement);
+
+    const crosshair = document.createElement('div');
+    crosshair.id = 'crosshair';
+    graphContainer.appendChild(crosshair);
+
+    composer = new EffectComposer(renderer);
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+
+    fxaaPass = new ShaderPass(FXAAShader);
+    fxaaPass.uniforms['resolution'].value.set(1 / 360, 1 / 360);
+    composer.addPass(fxaaPass);
+
+    function adjustFXAA(enabled, intensity = 1) {
+        fxaaPass.enabled = enabled;
+        if (enabled) {
+            const baseResolution = 360;
+            const adjustedResolution = baseResolution / intensity;
+            fxaaPass.uniforms['resolution'].value.set(1 / adjustedResolution, 1 / adjustedResolution);
+        }
+        composer.render();
+    }
+
+    adjustFXAA(false);
+
+    camera.position.set(10, 10, 10);
+    camera.lookAt(0, 0, 0);
+
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.screenSpacePanning = true;
+    controls.minDistance = 0.1;
+    controls.maxDistance = 400;
+
+    const axesHelper = new THREE.AxesHelper(10);
+    scene.add(axesHelper);
+
+    // Ambient light for softer base illumination
+    const ambientLight = new THREE.AmbientLight(0x606060, 1.0);  // Increased to soften overall lighting
+    scene.add(ambientLight);
+
+    // Directional lights with softer shadows
+    const lightIntensity = 0.25;  // Lowered for softer effect
+    const lightDistance = 20;
+
+    // Front (+z) - Shadow-casting
+    const lightFront = new THREE.DirectionalLight(0xffffff, lightIntensity);
+    lightFront.position.set(0, 0, lightDistance);
+    lightFront.castShadow = true;
+    lightFront.shadow.mapSize.width = 2048;  // Higher for softer shadows
+    lightFront.shadow.mapSize.height = 2048;
+    lightFront.shadow.camera.near = 0.5;
+    lightFront.shadow.camera.far = 50;
+    lightFront.shadow.camera.left = -10;
+    lightFront.shadow.camera.right = 10;
+    lightFront.shadow.camera.top = 10;
+    lightFront.shadow.camera.bottom = -10;
+    lightFront.shadow.bias = -0.001;  // Reduce acne
+    lightFront.shadow.radius = 2;     // Softer shadow edges
+    scene.add(lightFront);
+
+    // Back (-z) - No shadows
+    const lightBack = new THREE.DirectionalLight(0xffffff, lightIntensity);
+    lightBack.position.set(0, 0, -lightDistance);
+    lightBack.castShadow = false;
+    scene.add(lightBack);
+
+    // Left (-x) - No shadows
+    const lightLeft = new THREE.DirectionalLight(0xffffff, lightIntensity);
+    lightLeft.position.set(-lightDistance, 0, 0);
+    lightLeft.castShadow = false;
+    scene.add(lightLeft);
+
+    // Right (+x) - No shadows
+    const lightRight = new THREE.DirectionalLight(0xffffff, lightIntensity);
+    lightRight.position.set(lightDistance, 0, 0);
+    lightRight.castShadow = false;
+    scene.add(lightRight);
+
+    // Top (+y) - Shadow-casting
+    const lightTop = new THREE.DirectionalLight(0xffffff, lightIntensity);
+    lightTop.position.set(0, lightDistance, 0);
+    lightTop.castShadow = true;
+    lightTop.shadow.mapSize.width = 2048;
+    lightTop.shadow.mapSize.height = 2048;
+    lightTop.shadow.camera.near = 0.5;
+    lightTop.shadow.camera.far = 50;
+    lightTop.shadow.camera.left = -10;
+    lightTop.shadow.camera.right = 10;
+    lightTop.shadow.camera.top = 10;
+    lightTop.shadow.camera.bottom = -10;
+    lightTop.shadow.bias = -0.001;
+    lightTop.shadow.radius = 2;  // Softer shadow edges
+    scene.add(lightTop);
+
+    // Bottom (-y) - Shadow-casting
+    const lightBottom = new THREE.DirectionalLight(0xffffff, lightIntensity);
+    lightBottom.position.set(0, -lightDistance, 0);
+    lightBottom.castShadow = true;
+    lightBottom.shadow.mapSize.width = 2048;
+    lightBottom.shadow.mapSize.height = 2048;
+    lightBottom.shadow.camera.near = 0.5;
+    lightBottom.shadow.camera.far = 50;
+    lightBottom.shadow.camera.left = -10;
+    lightBottom.shadow.camera.right = 10;
+    lightBottom.shadow.camera.top = 10;
+    lightBottom.shadow.camera.bottom = -10;
+    lightBottom.shadow.bias = -0.001;
+    lightBottom.shadow.radius = 2;  // Softer shadow edges
+    scene.add(lightBottom);
+
+function createTextSprite(text, color) {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = 256; // Higher resolution
+    canvas.height = 256;
+    context.font = 'Bold 160px Arial'; // Scaled font size (40px * 4)
+    context.fillStyle = color;
+    context.textAlign = 'center'; // Center text
+    context.textBaseline = 'middle';
+    context.fillText(text, 128, 128); // Center in canvas
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.SpriteMaterial({ map: texture });
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(0.9, 0.9, 1); // Adjusted scale (2 / 4 = 0.5)
+    return sprite;
+}
+
+    const axisLength = 10;
+    const xLabel = createTextSprite('X', '#ff0000');
+    xLabel.position.set(axisLength + 0.5, 0, 0);
+    scene.add(xLabel);
+    const yLabel = createTextSprite('Y', '#00ff00');
+    yLabel.position.set(0, axisLength + 0.5, 0);
+    scene.add(yLabel);
+    const zLabel = createTextSprite('Z', '#33AAFF');
+    zLabel.position.set(0, 0, axisLength + 0.5);
+    scene.add(zLabel);
+
+    addScaleMarkers('x', range, 0xff0000, 1);
+    addScaleMarkers('y', range, 0x00ff00, 1);
+    addScaleMarkers('z', range, 0x5599FF, 1);
+
+    // Raycaster value display
+    const valueDisplay = document.createElement('div');
+    valueDisplay.style.position = 'absolute';
+    valueDisplay.style.bottom = '20px';
+    valueDisplay.style.left = '5px';
+    valueDisplay.style.color = '#d3d3d3';
+    valueDisplay.style.fontSize = '10px';
+    valueDisplay.style.background = 'rgba(0, 0, 0, 0.5)';
+    valueDisplay.style.padding = '2px';
+    valueDisplay.style.whiteSpace = 'nowrap';
+    graphContainer.appendChild(valueDisplay);
+
+    // TRACE value display
+    const traceDisplay = document.createElement('div');
+    traceDisplay.style.position = 'absolute';
+    traceDisplay.style.bottom = '5px';
+    traceDisplay.style.left = '5px';
+    traceDisplay.style.color = '#d3d3d3';
+    traceDisplay.style.fontSize = '10px';
+    traceDisplay.style.background = 'rgba(0, 0, 0, 0.5)';
+    traceDisplay.style.padding = '2px';
+    traceDisplay.style.whiteSpace = 'nowrap';
+    graphContainer.appendChild(traceDisplay);
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    const markerCanvas = document.createElement('canvas');
+    const markerContext = markerCanvas.getContext('2d');
+    markerCanvas.width = 32;
+    markerCanvas.height = 32;
+    markerContext.beginPath();
+    markerContext.arc(16, 16, 14, 0, 2 * Math.PI);
+    markerContext.fillStyle = '#ffff00';
+    markerContext.fill();
+    const markerTexture = new THREE.CanvasTexture(markerCanvas);
+    const markerMaterial = new THREE.SpriteMaterial({ map: markerTexture });
+    intersectionMarker = new THREE.Sprite(markerMaterial);
+    intersectionMarker.scale.set(0.1, 0.1, 0.1);
+    intersectionMarker.visible = false;
+    scene.add(intersectionMarker);
+
+    graphContainer.addEventListener('mousemove', (event) => {
+        const rect = renderer.domElement.getBoundingClientRect();
+        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        crosshair.style.left = `${event.clientX - rect.left - 10}px`;
+        crosshair.style.top = `${event.clientY - rect.top - 10}px`;
+
+        raycaster.setFromCamera(mouse, camera);
+        if (mesh && !isTracing) {
+            const intersects = raycaster.intersectObject(mesh);
+            if (intersects.length > 0) {
+                const point = intersects[0].point;
+                valueDisplay.textContent = `x: ${point.x.toFixed(2)}, y: ${point.y.toFixed(2)}, z: ${point.z.toFixed(2)}`;
+                intersectionMarker.position.copy(point);
+                const distance = camera.position.distanceTo(point);
+                const scale = 0.02 * distance;
+                intersectionMarker.scale.set(scale, scale, 1);
+                intersectionMarker.visible = true;
+            } else {
+                valueDisplay.textContent = '';
+                intersectionMarker.visible = false;
+            }
+        } else if (!isTracing) {
+            valueDisplay.textContent = '';
+            intersectionMarker.visible = false;
+        }
+    });
+}
+
+
+
+
+
+    function appendToDisplay(value) {
+        const start = display.selectionStart;
+        const end = display.selectionEnd;
+        const currentValue = display.value;
+        display.value = currentValue.substring(0, start) + value + currentValue.substring(end);
+        const newPosition = start + value.length;
+        display.setSelectionRange(newPosition, newPosition);
+        display.focus();
+    }
+
+    function clearDisplay() {
+        display.value = '';
+        clearPlot();
+        document.getElementById('sliders').innerHTML = '';
+        currentParams = {};
+        originalEquation = '';
+        isAnimating = false;
+    }
+
+    function clearPlot() {
+        if (mesh) {
+            scene.remove(mesh);
+            mesh.geometry.dispose();
+            mesh.material.dispose();
+            mesh = null;
+        }
+	isTracing = false; // Reset TRACE mode
+    	tracePositions = [];
+    	traceIndex = 0;
+	plotPositions = [];
+    	intersectionMarker.visible = false;
+        composer.render();
+    }
+
+    function backspace() {
+        display.value = display.value.slice(0, -1);
+    }
+
+    function calculate() {
+        try {
+            let expression = display.value.replace('^', '**')
+                .replace(/(?<!Math\.)sin\(/gi, 'Math.sin(')
+                .replace(/(?<!Math\.)cos\(/gi, 'Math.cos(')
+                .replace(/(?<!Math\.)tan\(/gi, 'Math.tan(')
+                .replace(/(?<!Math\.)sqrt\(/gi, 'Math.sqrt(')
+                .replace(/(?<!Math\.)log\(/gi, 'Math.log10(')
+                .replace(/(?<!Math\.)ln\(/gi, 'Math.log(')
+                .replace(/(?<!Math\.)exp\(/gi, 'Math.exp(')
+                .replace(/(?<!Math\.)abs\(/gi, 'Math.abs(')
+                .replace(/(?<!Math\.)sign\(/gi, 'Math.sign(');
+            const result = eval(expression);
+            display.value = Number(result.toFixed(10));
+        } catch (error) {
+            display.value = `Error: ${error.message}`;
+            setTimeout(clearDisplay, 1000);
+        }
+    }
+
+    const lineMaterial = new LineMaterial({
+        color: 0xcccccc,
+        linewidth: 0.5,
+        resolution: new THREE.Vector2(360, 360),
+        alphaToCoverage: true,
+        side: THREE.DoubleSide
+    });
+
+
+
+
+
+
+
+function plotImplicit(equation) {
+    try {
+        // Parse the implicit equation
+        const [left, right] = equation.split('=').map(s => s.trim());
+        const leftExpr = left
+            .replace(/(?<!Math\.)sin\(/gi, 'Math.sin(')
+            .replace(/(?<!Math\.)cos\(/gi, 'Math.cos(')
+            .replace(/(?<!Math\.)tan\(/gi, 'Math.tan(')
+            .replace(/(?<!Math\.)sqrt\(/gi, 'Math.sqrt(')
+            .replace(/(?<!Math\.)log\(/gi, 'Math.log10(')
+            .replace(/(?<!Math\.)ln\(/gi, 'Math.log(')
+            .replace(/(?<!Math\.)exp\(/gi, 'Math.exp(')
+            .replace(/(?<!Math\.)abs\(/gi, 'Math.abs(')
+            .replace(/(?<!Math\.)sign\(/gi, 'Math.sign(')
+            .replace(/\^/g, '**');
+        const rightExpr = right
+            .replace(/(?<!Math\.)sin\(/gi, 'Math.sin(')
+            .replace(/(?<!Math\.)cos\(/gi, 'Math.cos(')
+            .replace(/(?<!Math\.)tan\(/gi, 'Math.tan(')
+            .replace(/(?<!Math\.)sqrt\(/gi, 'Math.sqrt(')
+            .replace(/(?<!Math\.)log\(/gi, 'Math.log10(')
+            .replace(/(?<!Math\.)ln\(/gi, 'Math.log(')
+            .replace(/(?<!Math\.)exp\(/gi, 'Math.exp(')
+            .replace(/(?<!Math\.)abs\(/gi, 'Math.abs(')
+            .replace(/(?<!Math\.)sign\(/gi, 'Math.sign(')
+            .replace(/\^/g, '**');
+        const func = new Function('x', 'y', 'z', `return (${leftExpr}) - (${rightExpr})`);
+
+        // Grid parameters
+        const resolution = 350; // Ultra-high resolution
+        const radius = Math.max(3, Math.sqrt(parseFloat(rightExpr) || 9)); // Dynamic radius
+        const delta = 2.5 * radius / resolution;
+        const size = resolution;
+        const halfsize = size / 2.0;
+        const vertices = [];
+        const indices = [];
+        const vertexMap = new Map(); // Maps grid cell (x,y,z) to vertex index
+
+        // Evaluate function on grid with bounding check
+        const field = new Float32Array(size * size * size);
+        for (let z = 0; z < size; z++) {
+            const fz = (z - halfsize) * delta;
+            if (Math.abs(fz) > radius * 1.5) continue; // Skip empty regions
+            const z_offset = size * size * z;
+            for (let y = 0; y < size; y++) {
+                const fy = (y - halfsize) * delta;
+                if (Math.abs(fy) > radius * 1.5) continue;
+                const y_offset = z_offset + size * y;
+                for (let x = 0; x < size; x++) {
+                    const fx = (x - halfsize) * delta;
+                    if (Math.abs(fx) > radius * 1.5) continue;
+                    field[y_offset + x] = func(fx, fy, fz);
+                }
+            }
+        }
+
+        // Generate vertices and connectivity
+        for (let z = 0; z < size - 1; z++) {
+            const fz = (z - halfsize) * delta;
+            if (Math.abs(fz) > radius * 1.5) continue;
+            for (let y = 0; y < size - 1; y++) {
+                const fy = (y - halfsize) * delta;
+                if (Math.abs(fy) > radius * 1.5) continue;
+                for (let x = 0; x < size - 1; x++) {
+                    const fx = (x - halfsize) * delta;
+                    if (Math.abs(fx) > radius * 1.5) continue;
+                    const idx = z * size * size + y * size + x;
+                    const corners = [
+                        field[idx] || 1e10, // Handle skipped cells
+                        field[idx + 1] || 1e10,
+                        field[idx + size] || 1e10,
+                        field[idx + size + 1] || 1e10,
+                        field[idx + size * size] || 1e10,
+                        field[idx + size * size + 1] || 1e10,
+                        field[idx + size * size + size] || 1e10,
+                        field[idx + size * size + size + 1] || 1e10
+                    ];
+
+                    // Check if surface crosses this cell
+                    const minVal = Math.min(...corners);
+                    const maxVal = Math.max(...corners);
+                    if (minVal <= 0 && maxVal >= 0) {
+                        // Compute vertex position by averaging edge intersections
+                        let vx = fx;
+                        let vy = fy;
+                        let vz = fz;
+                        let count = 0;
+                        let sumX = 0, sumY = 0, sumZ = 0;
+
+                        // Check edges for zero crossings
+                        const edges = [
+                            [0, 1], [0, 2], [0, 4], // x, y, z from corner 0
+                            [1, 3], [1, 5],         // y, z from corner 1
+                            [2, 3], [2, 6],         // x, z from corner 2
+                            [3, 7],                 // z from corner 3
+                            [4, 5], [4, 6],         // x, y from corner 4
+                            [5, 7],                 // y from corner 5
+                            [6, 7]                  // x from corner 6
+                        ];
+                        const edgeOffsets = [
+                            [0, delta, 0, 0],       // 0-1: x
+                            [0, 0, delta, 0],       // 0-2: y
+                            [0, 0, 0, delta],       // 0-4: z
+                            [delta, 0, delta, 0],   // 1-3: y
+                            [delta, 0, 0, delta],   // 1-5: z
+                            [0, delta, 0, 0],       // 2-3: x
+                            [0, delta, 0, delta],   // 2-6: z
+                            [delta, delta, 0, delta], // 3-7: z
+                            [0, 0, 0, 0],           // 4-5: x
+                            [0, 0, delta, 0],       // 4-6: y
+                            [delta, 0, delta, 0],   // 5-7: y
+                            [0, delta, 0, 0]        // 6-7: x
+                        ];
+
+                        for (let i = 0; i < edges.length; i++) {
+                            const [c1, c2] = edges[i];
+                            if (corners[c1] * corners[c2] <= 0 && isFinite(corners[c1]) && isFinite(corners[c2])) {
+                                const t = corners[c1] / (corners[c1] - corners[c2]);
+                                if (isFinite(t)) {
+                                    const [dx1, dy1, dz1, dx2] = edgeOffsets[i];
+                                    sumX += vx + (dx1 + t * (dx2 - dx1));
+                                    sumY += vy + dy1;
+                                    sumZ += vz + dz1;
+                                    count++;
+                                }
+                            }
+                        }
+
+                        if (count > 0) {
+                            vx = sumX / count;
+                            vy = sumY / count;
+                            vz = sumZ / count;
+                        } else {
+                            // Fallback to cell center
+                            vx += delta / 2;
+                            vy += delta / 2;
+                            vz += delta / 2;
+                        }
+
+                        // Store vertex
+                        const vertexIdx = vertices.length / 3;
+                        vertices.push(vx, vy, vz);
+                        vertexMap.set(`${x},${y},${z}`, vertexIdx);
+
+                        // Generate quads by connecting to neighboring cells
+                        // Face in -x direction
+                        if (x > 0 && vertexMap.has(`${x-1},${y},${z}`)) {
+                            const i0 = vertexMap.get(`${x-1},${y},${z}`);
+                            const i1 = vertexIdx;
+                            if (y > 0 && vertexMap.has(`${x-1},${y-1},${z}`) && vertexMap.has(`${x},${y-1},${z}`)) {
+                                const i2 = vertexMap.get(`${x},${y-1},${z}`);
+                                const i3 = vertexMap.get(`${x-1},${y-1},${z}`);
+                                indices.push(i0, i1, i2, i0, i2, i3);
+                            }
+                        }
+                        // Face in -y direction
+                        if (y > 0 && vertexMap.has(`${x},${y-1},${z}`)) {
+                            const i0 = vertexMap.get(`${x},${y-1},${z}`);
+                            const i1 = vertexIdx;
+                            if (z > 0 && vertexMap.has(`${x},${y-1},${z-1}`) && vertexMap.has(`${x},${y},${z-1}`)) {
+                                const i2 = vertexMap.get(`${x},${y},${z-1}`);
+                                const i3 = vertexMap.get(`${x},${y-1},${z-1}`);
+                                indices.push(i0, i1, i2, i0, i2, i3);
+                            }
+                        }
+                        // Face in -z direction
+                        if (z > 0 && vertexMap.has(`${x},${y},${z-1}`)) {
+                            const i0 = vertexMap.get(`${x},${y},${z-1}`);
+                            const i1 = vertexIdx;
+                            if (x > 0 && vertexMap.has(`${x-1},${y},${z-1}`) && vertexMap.has(`${x-1},${y},${z}`)) {
+                                const i2 = vertexMap.get(`${x-1},${y},${z}`);
+                                const i3 = vertexMap.get(`${x-1},${y},${z-1}`);
+                                indices.push(i0, i1, i2, i0, i2, i3);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (vertices.length === 0) {
+            console.log('No surface found');
+            display.value = 'Error: No surface found';
+            setTimeout(() => { display.value = equation; }, 1500);
+            return;
+        }
+
+        // Smooth vertices using Laplacian smoothing
+        function smoothVertices(vertices, iterations = 4) {
+            let smoothedVertices = vertices.slice();
+            const neighbors = [
+                [-1, 0, 0], [1, 0, 0], // x
+                [0, -1, 0], [0, 1, 0], // y
+                [0, 0, -1], [0, 0, 1]  // z
+            ];
+
+            for (let iter = 0; iter < iterations; iter++) {
+                const tempVertices = new Array(vertices.length);
+                for (let i = 0; i < vertices.length; i += 3) {
+                    let sumX = 0, sumY = 0, sumZ = 0, count = 0;
+                    const x = vertices[i], y = vertices[i + 1], z = vertices[i + 2];
+
+                    // Find grid cell for this vertex
+                    const gridX = Math.round((x / delta + halfsize));
+                    const gridY = Math.round((y / delta + halfsize));
+                    const gridZ = Math.round((z / delta + halfsize));
+
+                    // Check neighbors
+                    for (const [dx, dy, dz] of neighbors) {
+                        const nx = gridX + dx, ny = gridY + dy, nz = gridZ + dz;
+                        const key = `${nx},${ny},${nz}`;
+                        if (vertexMap.has(key)) {
+                            const idx = vertexMap.get(key) * 3;
+                            sumX += vertices[idx];
+                            sumY += vertices[idx + 1];
+                            sumZ += vertices[idx + 2];
+                            count++;
+                        }
+                    }
+
+                    // Apply smoothing with higher neighbor influence
+                    if (count > 0) {
+                        tempVertices[i] = 0.4 * vertices[i] + 0.6 * (sumX / count);
+                        tempVertices[i + 1] = 0.4 * vertices[i + 1] + 0.6 * (sumY / count);
+                        tempVertices[i + 2] = 0.4 * vertices[i + 2] + 0.6 * (sumZ / count);
+                    } else {
+                        tempVertices[i] = vertices[i];
+                        tempVertices[i + 1] = vertices[i + 1];
+                        tempVertices[i + 2] = vertices[i + 2];
+                    }
+                }
+                smoothedVertices = tempVertices.slice();
+            }
+            return smoothedVertices;
+        }
+
+        // Apply smoothing
+        console.time('smoothing');
+        const smoothedVertices = smoothVertices(vertices, 4);
+        console.timeEnd('smoothing');
+
+        console.log(`Generated ${vertices.length / 3} vertices and ${indices.length / 3} triangles`);
+
+        // Create mesh
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(smoothedVertices, 3));
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals(); // For smooth shading
+
+        // Use MeshPhongMaterial for shaded rendering
+        const material = new THREE.MeshPhongMaterial({
+            color: 0xcccccc,
+            side: THREE.DoubleSide,
+            shininess: 50
+        });
+
+        // Generate wireframe for renderSurface
+        const wireframePositions = [];
+        for (let i = 0; i < indices.length; i += 3) {
+            const i0 = indices[i] * 3;
+            const i1 = indices[i + 1] * 3;
+            const i2 = indices[i + 2] * 3;
+            wireframePositions.push(
+                smoothedVertices[i0], smoothedVertices[i0 + 1], smoothedVertices[i0 + 2],
+                smoothedVertices[i1], smoothedVertices[i1 + 1], smoothedVertices[i1 + 2],
+                smoothedVertices[i1], smoothedVertices[i1 + 1], smoothedVertices[i1 + 2],
+                smoothedVertices[i2], smoothedVertices[i2 + 1], smoothedVertices[i2 + 2],
+                smoothedVertices[i2], smoothedVertices[i2 + 1], smoothedVertices[i2 + 2],
+                smoothedVertices[i0], smoothedVertices[i0 + 1], smoothedVertices[i0 + 2]
+            );
+        }
+
+        wireframeGeometry = new LineGeometry();
+        wireframeGeometry.setPositions(wireframePositions);
+        wireframeMaterial = new LineMaterial({
+            color: 0xcccccc,
+            linewidth: 0.5,
+            resolution: new THREE.Vector2(360, 360),
+            alphaToCoverage: true
+        });
+
+        // Add mesh to scene
+        if (mesh) {
+            scene.remove(mesh);
+            mesh.geometry.dispose();
+            mesh.material.dispose();
+        }
+        mesh = new THREE.Mesh(geometry, material);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        scene.add(mesh);
+
+        // Update plot bounds and positions
+        window.plotBounds = computePlotBounds(smoothedVertices);
+        plotPositions = smoothedVertices.slice();
+
+        // Densify tracePositions for smoother tracing
+        const denseTracePositions = [];
+        for (let i = 0; i < indices.length; i += 3) {
+            const i0 = indices[i] * 3, i1 = indices[i + 1] * 3, i2 = indices[i + 2] * 3;
+            for (let t = 0; t <= 1; t += 0.05) { // Finer steps
+                denseTracePositions.push(
+                    smoothedVertices[i0] * (1 - t) + smoothedVertices[i1] * t,
+                    smoothedVertices[i0 + 1] * (1 - t) + smoothedVertices[i1 + 1] * t,
+                    smoothedVertices[i0 + 2] * (1 - t) + smoothedVertices[i1 + 2] * t
+                );
+                denseTracePositions.push(
+                    smoothedVertices[i1] * (1 - t) + smoothedVertices[i2] * t,
+                    smoothedVertices[i1 + 1] * (1 - t) + smoothedVertices[i2 + 1] * t,
+                    smoothedVertices[i1 + 2] * (1 - t) + smoothedVertices[i2 + 2] * t
+                );
+            }
+        }
+        tracePositions = denseTracePositions;
+
+        isRendered = true; // Start as shaded mesh
+        document.getElementById('renderBtn').textContent = 'Wire';
+
+        composer.render();
+        if (!isAnimating) {
+            isAnimating = true;
+            animate();
+        }
+    } catch (error) {
+        console.error('Plotting error:', error);
+        display.value = `Error: ${error.message}`;
+        setTimeout(() => { display.value = equation; }, 1500);
+    }
+}
+
+
+
+
+
+
+
+    const standardizeExpr = (expr) => {
+        if (typeof expr !== 'string') expr = String(expr);
+        let standardized = expr
+            .replace(/(?<!Math\.)sqrt/gi, 'Math.sqrt')
+            .replace('^', '**')
+            .replace(/(?<!Math\.)sin\(/gi, 'Math.sin(')
+            .replace(/(?<!Math\.)cos\(/gi, 'Math.cos(')
+            .replace(/(?<!Math\.)tan\(/gi, 'Math.tan(')
+            .replace(/(?<!Math\.)log\(/gi, 'Math.log10(')
+            .replace(/(?<!Math\.)ln\(/gi, 'Math.log(')
+            .replace(/(?<!Math\.)exp\(/gi, 'Math.exp(')
+            .replace(/(?<!Math\.)abs\(/gi, 'Math.abs(')
+            .replace(/(?<!Math\.)sign\(/gi, 'Math.sign(')
+            .replace(/(\d+)([a-zA-Z])/g, '$1*$2')
+            .replace(/([a-zA-Z])(\d+)/g, '$1*$2')
+            .replace(/([^+\-*/%(\s][^\s%]*)\s*\%\s*(\([^\s()]*\)|[^+\-*/%\s]+)/g, '($1 % $2)')
+            .replace(/t1/gi, 'u');
+        return standardized.replace(/[^\x20-\x7E]/g, '');
+    };
+
+
+
+
+// Compute bounding box from positions array
+function computePlotBounds(positions) {
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    let minZ = Infinity, maxZ = -Infinity;
+
+    for (let i = 0; i < positions.length; i += 3) {
+        const x = positions[i];
+        const y = positions[i + 1];
+        const z = positions[i + 2];
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+        minZ = Math.min(minZ, z);
+        maxZ = Math.max(maxZ, z);
+    }
+
+    // Handle empty or invalid plots
+    if (!isFinite(minX)) {
+        return null; // No valid bounds
+    }
+
+    return { minX, maxX, minY, maxY, minZ, maxZ };
+}
+
+// Reset camera view based on plot bounds
+function resetCameraView() {
+    if (!window.plotBounds) {
+        // Fallback to default view
+        camera.position.set(10, 10, 10);
+        controls.target.set(0, 0, 0);
+    } else {
+        const { minX, maxX, minY, maxY, minZ, maxZ } = window.plotBounds;
+        // Calculate plot center
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        const centerZ = (minZ + maxZ) / 2;
+        // Calculate plot extents
+        const extentX = maxX - minX;
+        const extentY = maxY - minY;
+        const extentZ = maxZ - minZ;
+        // Largest extent in viewport plane (x-y)
+        const viewExtent = Math.max(extentX, extentY);
+        // Account for camera FOV (75 degrees vertical)
+        const fovRad = THREE.MathUtils.degToRad(camera.fov); // 75° in radians
+        const viewportHeight = 360; // Viewport height in pixels
+        // Distance to fit viewExtent in vertical FOV with padding
+        const distance = (viewExtent / 2 / Math.tan(fovRad / 2)) * 2.0; // 20% padding
+        // Position camera along z-axis above center
+        camera.position.set(centerX, centerY, centerZ + distance);
+        camera.lookAt(centerX, centerY, centerZ);
+        controls.target.set(centerX, centerY, centerZ);
+    }
+    controls.update();
+    composer.render();
+}
+
+
+function saveEquation() {
+    const equation = display.value.trim();
+    if (equation && !storedEquations.includes(equation)) {
+        storedEquations.push(equation);
+        localStorage.setItem('storedEquations', JSON.stringify(storedEquations));
+        updateEquationList();
+        console.log(`Saved equation: ${equation}`);
+    } else if (!equation) {
+        console.log('No equation to save');
+    } else {
+        console.log('Equation already saved');
+    }
+}
+
+
+
+
+
+function plotFunctionV2() {
+    console.log('Running plotFunctionV2 - version marker');
+    try {
+clearPlot();
+    scene.children.forEach(child => {
+        if ((child instanceof THREE.Line && (child.material.opacity === 0.5 || child.material.opacity === 0.7)) ||
+            child.userData?.type === 'tick' || child.userData?.type === 'numberSprite') {
+            scene.remove(child);
+            child.geometry.dispose();
+            child.material.dispose();
+        }
+    });
+        addScaleMarkers('x', range, 0xff0000, 1);
+        addScaleMarkers('y', range, 0x00ff00, 1);
+        addScaleMarkers('z', range, 0x0000ff, 1);
+
+        let equation = display.value;
+        let is3DY = equation.includes('y=');
+        let is3DZ = equation.includes('z=');
+        let isImplicit = equation.includes('=') && !is3DY && !is3DZ;
+        let isParametric = equation.includes('x(t)') || equation.includes('y(t)') || equation.includes('z(t)');
+
+        console.log('Conditions: is3DY=', is3DY, 'is3DZ=', is3DZ, 'isImplicit=', isImplicit, 'isParametric=', isParametric);
+
+
+
+// After type checks and before normalization
+if (!isSliderUpdate) {
+    originalEquation = equation; // Set original equation on initial plot
+    if (isParametric) {
+        currentParams = generateSliders(parseParameters(originalEquation));
+    } else {
+        document.getElementById('sliders').innerHTML = '';
+        currentParams = {};
+        originalEquation = '';
+    }
+} else if (isParametric && Object.keys(currentParams).length === 0) {
+    // Handle case where sliders were cleared but equation is still parametric
+    originalEquation = equation;
+    currentParams = generateSliders(parseParameters(originalEquation));
+}
+
+        let normalizedEquation = equation.replace(/\s+/g, '');
+        let expression = normalizedEquation.replace(/(?<!Math\.)sqrt/gi, 'Math.sqrt')
+            .replace('^', '**')
+            .replace(/(?<!Math\.)sin\(/gi, 'Math.sin(')
+            .replace(/(?<!Math\.)cos\(/gi, 'Math.cos(')
+            .replace(/(?<!Math\.)tan\(/gi, 'Math.tan(')
+            .replace(/(?<!Math\.)log\(/gi, 'Math.log10(')
+            .replace(/(?<!Math\.)ln\(/gi, 'Math.log(')
+            .replace(/(?<!Math\.)exp\(/gi, 'Math.exp(')
+            .replace(/(?<!Math\.)abs\(/gi, 'Math.abs(')
+            .replace(/(?<!Math\.)sign\(/gi, 'Math.sign(');
+
+        is3DY = is3DY || expression.includes('y=');
+        is3DZ = is3DZ || expression.includes('z=');
+        isImplicit = expression.includes('=') && !is3DY && !is3DZ;
+
+        if (is3DY) expression = expression.split('y=')[1];
+        else if (is3DZ) expression = expression.split('z=')[1];
+
+        console.log('Processed expression:', expression);
+
+        const positions = [];
+        const colors = [];
+        const lightDir = new THREE.Vector3(10, 10, 10).normalize();
+        const lightDir2 = new THREE.Vector3(-10, 10, -10).normalize();
+
+        if (is3DY) {
+            console.log('Plotting as y = f(x, z)');
+            const func = new Function('x', 'z', 'return ' + expression);
+            for (let x = -range; x < range; x += step) {
+                for (let z = -range; z < range; z += step) {
+                    const y1 = func(x, z);
+                    const y2 = func(x + step, z);
+                    const y3 = func(x, z + step);
+                    const y4 = func(x + step, z + step);
+                    if (isFinite(y1) && isFinite(y2) && isFinite(y3) && isFinite(y4)) {
+                        // Segment 1: x to x + step
+                        positions.push(x, y1, z, x + step, y2, z);
+                        let dir = new THREE.Vector3(x + step - x, y2 - y1, z - z).normalize();
+                        let diffuse = Math.max(dir.dot(lightDir), 0.0);
+                        let diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                        let totalDiffuse = (diffuse + diffuse2) * 0.5;
+                        let color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+
+                        // Segment 2: z to z + step
+                        positions.push(x, y1, z, x, y3, z + step);
+                        dir = new THREE.Vector3(x - x, y3 - y1, z + step - z).normalize();
+                        diffuse = Math.max(dir.dot(lightDir), 0.0);
+                        diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                        totalDiffuse = (diffuse + diffuse2) * 0.5;
+                        color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+
+                        // Segment 3: x + step to x + step, z + step
+                        positions.push(x + step, y2, z, x + step, y4, z + step);
+                        dir = new THREE.Vector3(x + step - x + step, y4 - y2, z + step - z).normalize();
+                        diffuse = Math.max(dir.dot(lightDir), 0.0);
+                        diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                        totalDiffuse = (diffuse + diffuse2) * 0.5;
+                        color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+
+                        // Segment 4: z + step to x + step, z + step
+                        positions.push(x, y3, z + step, x + step, y4, z + step);
+                        dir = new THREE.Vector3(x + step - x, y4 - y3, z + step - z + step).normalize();
+                        diffuse = Math.max(dir.dot(lightDir), 0.0);
+                        diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                        totalDiffuse = (diffuse + diffuse2) * 0.5;
+                        color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+                    }
+                }
+            }
+        } else if (is3DZ) {
+            console.log('Plotting as z = f(x, y)');
+            const func = new Function('x', 'y', 'return ' + expression);
+            for (let x = -range; x < range; x += step) {
+                for (let y = -range; y < range; y += step) {
+                    const z1 = func(x, y);
+                    const z2 = func(x + step, y);
+                    const z3 = func(x, y + step);
+                    const z4 = func(x + step, y + step);
+                    if (isFinite(z1) && isFinite(z2) && isFinite(z3) && isFinite(z4)) {
+                        positions.push(x, y, z1, x + step, y, z2);
+                        let dir = new THREE.Vector3(x + step - x, y - y, z2 - z1).normalize();
+                        let diffuse = Math.max(dir.dot(lightDir), 0.0);
+                        let diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                        let totalDiffuse = (diffuse + diffuse2) * 0.5;
+                        let color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+
+                        positions.push(x, y, z1, x, y + step, z3);
+                        dir = new THREE.Vector3(x - x, y + step - y, z3 - z1).normalize();
+                        diffuse = Math.max(dir.dot(lightDir), 0.0);
+                        diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                        totalDiffuse = (diffuse + diffuse2) * 0.5;
+                        color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+
+                        positions.push(x + step, y, z2, x + step, y + step, z4);
+                        dir = new THREE.Vector3(x + step - x + step, y + step - y, z4 - z2).normalize();
+                        diffuse = Math.max(dir.dot(lightDir), 0.0);
+                        diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                        totalDiffuse = (diffuse + diffuse2) * 0.5;
+                        color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+
+                        positions.push(x, y + step, z3, x + step, y + step, z4);
+                        dir = new THREE.Vector3(x + step - x, y + step - y + step, z4 - z3).normalize();
+                        diffuse = Math.max(dir.dot(lightDir), 0.0);
+                        diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                        totalDiffuse = (diffuse + diffuse2) * 0.5;
+                        color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+                    }
+                }
+            }
+        } else if (isParametric) {
+            console.log('Plotting as parametric');
+            const parts = normalizedEquation.split(',').map(s => s.trim());
+            if (parts.length !== 3) throw new Error('Parametric equations must have x(t), y(t), z(t)');
+            let xExprRaw = parts[0].replace(/x\(t\)=/gi, '').replace(/^=/, '').trim();
+            let yExprRaw = parts[1].replace(/y\(t\)=/gi, '').replace(/^=/, '').trim();
+            let zExprRaw = parts[2].replace(/z\(t\)=/gi, '').replace(/^=/, '').trim();
+
+            const is2DParametric = xExprRaw.includes('u') || yExprRaw.includes('u') || zExprRaw.includes('u');
+
+            let xExpr = standardizeExpr(xExprRaw);
+            let yExpr = standardizeExpr(yExprRaw);
+            let zExpr = standardizeExpr(zExprRaw);
+
+            const balanceParentheses = (str) => {
+                let openCount = 0;
+                let lastOpenIndex = -1;
+                for (let i = 0; i < str.length; i++) {
+                    if (str[i] === '(') {
+                        openCount++;
+                        if (openCount === 1) lastOpenIndex = i;
+                    } else if (str[i] === ')') {
+                        openCount--;
+                        if (openCount < 0) return str;
+                        if (openCount === 0 && lastOpenIndex === 0 && i === str.length - 1) {
+                            const inner = str.slice(1, -1);
+                            try {
+                                new Function('t', 'u', 'return ' + inner);
+                                return balanceParentheses(inner);
+                            } catch (e) {
+                                return str;
+                            }
+                        }
+                    }
+                }
+                return str;
+            };
+
+            xExpr = balanceParentheses(xExpr);
+            yExpr = balanceParentheses(yExpr);
+            zExpr = balanceParentheses(zExpr);
+
+            const hasXDependency = yExpr.includes('x') || zExpr.includes('x');
+            const hasYDependency = zExpr.includes('y');
+
+            let xFunc, yFunc, zFunc;
+            if (is2DParametric) {
+                console.log('Entering 2D parametric branch');
+                xFunc = new Function('t', 'u', 'return ' + xExpr);
+                yFunc = hasXDependency ? new Function('t', 'u', 'x', 'return ' + yExpr) : new Function('t', 'u', 'return ' + yExpr);
+                zFunc = hasYDependency ? new Function('t', 'u', 'x', 'y', 'return ' + zExpr) :
+                        hasXDependency ? new Function('t', 'u', 'x', 'return ' + zExpr) :
+                        new Function('t', 'u', 'return ' + zExpr);
+
+                for (let t = -range; t < range; t += step) {
+                    for (let u = -rangeU; u < rangeU; u += stepU) {
+                        const x1 = xFunc(t, u);
+                        const y1 = hasXDependency ? yFunc(t, u, x1) : yFunc(t, u);
+                        const z1 = hasYDependency ? zFunc(t, u, x1, y1) : hasXDependency ? zFunc(t, u, x1) : zFunc(t, u);
+
+                        const x2 = xFunc(t + step, u);
+                        const y2 = hasXDependency ? yFunc(t + step, u, x2) : yFunc(t + step, u);
+                        const z2 = hasYDependency ? zFunc(t + step, u, x2, y2) : hasXDependency ? zFunc(t + step, u, x2) : zFunc(t + step, u);
+
+                        const x3 = xFunc(t, u + stepU);
+                        const y3 = hasXDependency ? yFunc(t, u + stepU, x3) : yFunc(t, u + stepU);
+                        const z3 = hasYDependency ? zFunc(t, u + stepU, x3, y3) : hasXDependency ? zFunc(t, u + stepU, x3) : zFunc(t, u + stepU);
+
+                        if (isFinite(x1) && isFinite(y1) && isFinite(z1) && 
+                            isFinite(x2) && isFinite(y2) && isFinite(z2)) {
+                            positions.push(x1, y1, z1, x2, y2, z2);
+                            let dir = new THREE.Vector3(x2 - x1, y2 - y1, z2 - z1).normalize();
+                            let diffuse = Math.max(dir.dot(lightDir), 0.0);
+                            let diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                            let totalDiffuse = (diffuse + diffuse2) * 0.5;
+                            let color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                            colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+                        }
+                        if (isFinite(x1) && isFinite(y1) && isFinite(z1) && 
+                            isFinite(x3) && isFinite(y3) && isFinite(z3)) {
+                            positions.push(x1, y1, z1, x3, y3, z3);
+                            let dir = new THREE.Vector3(x3 - x1, y3 - y1, z3 - z1).normalize();
+                            let diffuse = Math.max(dir.dot(lightDir), 0.0);
+                            let diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                            let totalDiffuse = (diffuse + diffuse2) * 0.5;
+                            let color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                            colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+                        }
+                    }
+                }
+            } else {
+                console.log('Entering 1D parametric branch');
+                const uValue = 1;
+                xFunc = new Function('t', 'u', 'return ' + xExpr);
+                yFunc = hasXDependency ? new Function('t', 'u', 'x', 'return ' + yExpr) : new Function('t', 'u', 'return ' + yExpr);
+                zFunc = hasXDependency ? new Function('t', 'u', 'x', 'return ' + zExpr) :
+                        hasYDependency ? new Function('t', 'u', 'x', 'y', 'return ' + zExpr) :
+                        new Function('t', 'u', 'return ' + zExpr);
+
+                for (let t = -range; t < range; t += step) {
+                    const x1 = xFunc(t, uValue);
+                    const y1 = hasXDependency ? yFunc(t, uValue, x1) : yFunc(t, uValue);
+                    const z1 = zFunc(t, uValue);
+
+                    const x2 = xFunc(t + step, uValue);
+                    const y2 = hasXDependency ? yFunc(t + step, uValue, x2) : yFunc(t + step, uValue);
+                    const z2 = zFunc(t + step, uValue);
+
+                    if (isFinite(x1) && isFinite(y1) && isFinite(z1) && 
+                        isFinite(x2) && isFinite(y2) && isFinite(z2)) {
+                        positions.push(x1, y1, z1, x2, y2, z2);
+                        let dir = new THREE.Vector3(x2 - x1, y2 - y1, z2 - z1).normalize();
+                        let diffuse = Math.max(dir.dot(lightDir), 0.0);
+                        let diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                        let totalDiffuse = (diffuse + diffuse2) * 0.5;
+                        let color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+                    }
+                }
+            }
+        } else if (isImplicit) {
+            console.log('Plotting as implicit');
+            plotImplicit(normalizedEquation);
+            return;
+        } else if (expression.includes('x') && expression.includes('y') && !expression.includes('z')) {
+            console.log('Plotting as z = f(x, y)');
+            const func = new Function('x', 'y', 'return ' + expression);
+            for (let x = -range; x < range; x += step) {
+                for (let y = -range; y < range; y += step) {
+                    const z1 = func(x, y);
+                    const z2 = func(x + step, y);
+                    const z3 = func(x, y + step);
+                    const z4 = func(x + step, y + step);
+                    if (isFinite(z1) && isFinite(z2) && isFinite(z3) && isFinite(z4)) {
+                        positions.push(x, y, z1, x + step, y, z2);
+                        let dir = new THREE.Vector3(x + step - x, y - y, z2 - z1).normalize();
+                        let diffuse = Math.max(dir.dot(lightDir), 0.0);
+                        let diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                        let totalDiffuse = (diffuse + diffuse2) * 0.5;
+                        let color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+
+                        positions.push(x, y, z1, x, y + step, z3);
+                        dir = new THREE.Vector3(x - x, y + step - y, z3 - z1).normalize();
+                        diffuse = Math.max(dir.dot(lightDir), 0.0);
+                        diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                        totalDiffuse = (diffuse + diffuse2) * 0.5;
+                        color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+
+                        positions.push(x + step, y, z2, x + step, y + step, z4);
+                        dir = new THREE.Vector3(x + step - x + step, y + step - y, z4 - z2).normalize();
+                        diffuse = Math.max(dir.dot(lightDir), 0.0);
+                        diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                        totalDiffuse = (diffuse + diffuse2) * 0.5;
+                        color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+
+                        positions.push(x, y + step, z3, x + step, y + step, z4);
+                        dir = new THREE.Vector3(x + step - x, y + step - y + step, z4 - z3).normalize();
+                        diffuse = Math.max(dir.dot(lightDir), 0.0);
+                        diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                        totalDiffuse = (diffuse + diffuse2) * 0.5;
+                        color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+                    }
+                }
+            }
+        } else if (expression.includes('x') && expression.includes('z') && !expression.includes('y')) {
+            console.log('Plotting as y = f(x, z)');
+            const func = new Function('x', 'z', 'return ' + expression);
+            for (let x = -range; x < range; x += step) {
+                for (let z = -range; z < range; z += step) {
+                    const y1 = func(x, z);
+                    const y2 = func(x + step, z);
+                    const y3 = func(x, z + step);
+                    const y4 = func(x + step, z + step);
+                    if (isFinite(y1) && isFinite(y2) && isFinite(y3) && isFinite(y4)) {
+                        positions.push(x, y1, z, x + step, y2, z);
+                        let dir = new THREE.Vector3(x + step - x, y2 - y1, z - z).normalize();
+                        let diffuse = Math.max(dir.dot(lightDir), 0.0);
+                        let diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                        let totalDiffuse = (diffuse + diffuse2) * 0.5;
+                        let color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+
+                        positions.push(x, y1, z, x, y3, z + step);
+                        dir = new THREE.Vector3(x - x, y3 - y1, z + step - z).normalize();
+                        diffuse = Math.max(dir.dot(lightDir), 0.0);
+                        diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                        totalDiffuse = (diffuse + diffuse2) * 0.5;
+                        color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+
+                        positions.push(x + step, y2, z, x + step, y4, z + step);
+                        dir = new THREE.Vector3(x + step - x + step, y4 - y2, z + step - z).normalize();
+                        diffuse = Math.max(dir.dot(lightDir), 0.0);
+                        diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                        totalDiffuse = (diffuse + diffuse2) * 0.5;
+                        color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+
+                        positions.push(x, y3, z + step, x + step, y4, z + step);
+                        dir = new THREE.Vector3(x + step - x, y4 - y3, z + step - z + step).normalize();
+                        diffuse = Math.max(dir.dot(lightDir), 0.0);
+                        diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                        totalDiffuse = (diffuse + diffuse2) * 0.5;
+                        color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+                    }
+                }
+            }
+        } else if (expression.includes('y') && expression.includes('z') && !expression.includes('x')) {
+            console.log('Plotting as x = f(y, z)');
+            const func = new Function('y', 'z', 'return ' + expression);
+            for (let y = -range; y < range; y += step) {
+                for (let z = -range; z < range; z += step) {
+                    const x1 = func(y, z);
+                    const x2 = func(y + step, z);
+                    const x3 = func(y, z + step);
+                    const x4 = func(y + step, z + step);
+                    if (isFinite(x1) && isFinite(x2) && isFinite(x3) && isFinite(x4)) {
+                        positions.push(x1, y, z, x2, y + step, z);
+                        let dir = new THREE.Vector3(x2 - x1, y + step - y, z - z).normalize();
+                        let diffuse = Math.max(dir.dot(lightDir), 0.0);
+                        let diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                        let totalDiffuse = (diffuse + diffuse2) * 0.5;
+                        let color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+
+                        positions.push(x1, y, z, x3, y, z + step);
+                        dir = new THREE.Vector3(x3 - x1, y - y, z + step - z).normalize();
+                        diffuse = Math.max(dir.dot(lightDir), 0.0);
+                        diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                        totalDiffuse = (diffuse + diffuse2) * 0.5;
+                        color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+
+                        positions.push(x2, y + step, z, x4, y + step, z + step);
+                        dir = new THREE.Vector3(x4 - x2, y + step - y + step, z + step - z).normalize();
+                        diffuse = Math.max(dir.dot(lightDir), 0.0);
+                        diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                        totalDiffuse = (diffuse + diffuse2) * 0.5;
+                        color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+
+                        positions.push(x3, y, z + step, x4, y + step, z + step);
+                        dir = new THREE.Vector3(x4 - x3, y + step - y, z + step - z + step).normalize();
+                        diffuse = Math.max(dir.dot(lightDir), 0.0);
+                        diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                        totalDiffuse = (diffuse + diffuse2) * 0.5;
+                        color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                        colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+                    }
+                }
+            }
+        } else if (expression.includes('x') && !expression.includes('y') && !expression.includes('z')) {
+            console.log('Plotting as y = f(x)');
+            const func = new Function('x', 'return ' + expression);
+            for (let x = -range; x < range; x += step) {
+                const y1 = func(x);
+                const y2 = func(x + step);
+                if (isFinite(y1) && isFinite(y2)) {
+                    positions.push(x, y1, 0, x + step, y2, 0);
+                    let dir = new THREE.Vector3(x + step - x, y2 - y1, 0).normalize();
+                    let diffuse = Math.max(dir.dot(lightDir), 0.0);
+                    let diffuse2 = Math.max(dir.dot(lightDir2), 0.0);
+                    let totalDiffuse = (diffuse + diffuse2) * 0.5;
+                    let color = new THREE.Color(0xcccccc).multiplyScalar(0.0 + 1.0 * totalDiffuse);
+                    colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+                }
+            }
+        } else {
+            throw new Error('Expression must contain valid variables');
+        }
+
+        const geometry = new LineGeometry();
+        geometry.setPositions(positions);
+        geometry.setColors(colors);
+        mesh = new Line2(geometry, lineMaterial);
+        mesh.computeLineDistances();
+        scene.add(mesh);
+        window.plotBounds = computePlotBounds(positions);
+	plotPositions = positions.slice();
+	tracePositions = positions.slice();
+
+	// Store wireframe state
+        	wireframeGeometry = geometry.clone();
+       	 wireframeMaterial = lineMaterial.clone();
+        	isRendered = false;  // Reset to wireframe state
+        	document.getElementById('renderBtn').textContent = 'Render';  // Reset button text
+
+        composer.render();
+        if (!isAnimating) {
+            isAnimating = true;
+            animate();
+        }
+    } catch (error) {
+        console.error('Plotting error:', error);
+        const originalValue = display.value;
+        display.value = `Error: ${error.message}`;
+        setTimeout(() => {
+            display.value = originalValue;
+        }, 1500);
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+function parseParameters(equation) {
+    const parts = equation.split(',').map(s => s.trim());
+    const params = {};
+    let paramIndex = 0;
+
+    parts.forEach((part, i) => {
+        const prefix = ['x', 'y', 'z'][i];
+        const expr = part.replace(/^[xyz]\(t\)=/, '').trim();
+        console.log('Expression:', expr);
+        const matches = [...expr.matchAll(/(^|[+\-*/(\s])-?\d*\.?\d+/g)];
+        console.log('Matches found:', matches.length, matches.map(m => m[0]));
+
+        matches.forEach((match, matchIndex) => {
+            const fullMatch = match[0].trim();
+            const num = fullMatch.replace(/^[+\s(]+|[)\s]+$/g, ''); // Strip leading +/space/( and trailing )/space
+            console.log(`Processing match ${matchIndex}: fullMatch=${fullMatch}, num=${num}`);
+
+            if (num === '' || num.includes('Math.PI')) {
+                console.log(`Skipping match ${matchIndex}: empty or contains Math.PI`);
+                return;
+            }
+
+            const value = parseFloat(num);
+            if (isNaN(value)) {
+                console.log(`Skipping match ${matchIndex}: NaN value`);
+                return;
+            }
+
+            const numIndex = expr.indexOf(num);
+            const nextCharIndex = numIndex + num.length;
+            const nextChar = expr[nextCharIndex] || '';
+            const nextSegment = expr.slice(nextCharIndex, nextCharIndex + 10);
+            console.log(`Match ${matchIndex}: numIndex=${numIndex}, nextChar=${nextChar}, nextSegment=${nextSegment}`);
+
+            const isFreqT = nextChar === '*' && (nextSegment.includes('t') && !nextSegment.includes('sin') && !nextSegment.includes('cos'));
+            const isFreqU = nextChar === '*' && (nextSegment.includes('u') && !nextSegment.includes('sin') && !nextSegment.includes('cos'));
+
+            let key;
+            if (isFreqT) {
+                key = `${prefix}_freq_t${paramIndex}`;
+            } else if (isFreqU) {
+                key = `${prefix}_freq_u${paramIndex}`;
+            } else {
+                key = `${prefix}_coeff${paramIndex}`;
+            }
+            params[key] = { value, original: num, min: key.includes('freq') ? 0.0001 : -10, max: 10 };
+            console.log(`Added param ${key}: value=${value}, original=${num}`);
+            paramIndex++;
+        });
+    });
+
+    console.log('Parsed parameters (full list):', JSON.stringify(params, null, 2));
+    return params;
+}
+
+
+
+function getPlotPositions(equation) {
+    const parts = equation.split(',').map(s => s.trim());
+    if (parts.length !== 3) return [];
+    let xExpr = standardizeExpr(parts[0].replace(/x\(t\)=/gi, '').trim());
+    let yExpr = standardizeExpr(parts[1].replace(/y\(t\)=/gi, '').trim());
+    let zExpr = standardizeExpr(parts[2].replace(/z\(t\)=/gi, '').trim());
+
+    const is2DParametric = xExpr.includes('u') || yExpr.includes('u') || zExpr.includes('u');
+    const positions = [];
+    const uValue = 1;
+
+    const xFunc = new Function('t', 'u', 'return ' + xExpr);
+    const yFunc = yExpr.includes('x') ? new Function('t', 'u', 'x', 'return ' + yExpr) : new Function('t', 'u', 'return ' + yExpr);
+    const zFunc = zExpr.includes('y') ? new Function('t', 'u', 'x', 'y', 'return ' + zExpr) :
+                 zExpr.includes('x') ? new Function('t', 'u', 'x', 'return ' + zExpr) :
+                 new Function('t', 'u', 'return ' + zExpr);
+
+    if (is2DParametric) {
+        for (let t = -range; t < range; t += step) {
+            for (let u = -rangeU; u < rangeU; u += stepU) {
+                const x1 = xFunc(t, u);
+                const y1 = yExpr.includes('x') ? yFunc(t, u, x1) : yFunc(t, u);
+                const z1 = zExpr.includes('y') ? zFunc(t, u, x1, y1) : zExpr.includes('x') ? zFunc(t, u, x1) : zFunc(t, u);
+                if (isFinite(x1) && isFinite(y1) && isFinite(z1)) positions.push(x1, y1, z1);
+            }
+        }
+    } else {
+        for (let t = -range; t < range; t += step) {
+            const x1 = xFunc(t, uValue);
+            const y1 = yExpr.includes('x') ? yFunc(t, uValue, x1) : yFunc(t, uValue);
+            const z1 = zExpr.includes('y') ? zFunc(t, uValue, x1, y1) : zExpr.includes('x') ? zFunc(t, uValue, x1) : zFunc(t, uValue);
+            if (isFinite(x1) && isFinite(y1) && isFinite(z1)) positions.push(x1, y1, z1);
+        }
+    }
+    return positions;
+}
+
+
+function arraysEqual(arr1, arr2, tolerance = 0.01) {
+    if (arr1.length !== arr2.length) return false;
+    return arr1.every((val, i) => Math.abs(val - arr2[i]) < tolerance);
+}
+
+
+
+
+
+
+
+function generateSliders(params) {
+    const slidersDiv = document.getElementById('sliders');
+    slidersDiv.innerHTML = '';
+    const operativeParams = {};
+
+    console.log('Starting slider generation with params:', params);
+    console.log('originalEquation:', originalEquation);
+
+    Object.entries(params).forEach(([key, param]) => {
+        console.log(`Param ${key}: value=${param.value}, original=${param.original}`);
+        const testValue = param.value + 5;
+        if (isNaN(testValue)) return;
+        let testEq = originalEquation;
+        let replaced = false;
+
+        const escapedOriginal = param.original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        let regex = new RegExp(`(^|=|[*+/\\-(])${escapedOriginal}([*+/\\-()]|[tu]|$)`, 'g');
+        
+        testEq = testEq.replace(regex, (match, prefix, suffix) => {
+            console.log(`Match for ${key}: fullMatch="${match}", prefix="${prefix}", suffix="${suffix}"`);
+            if (!replaced) {
+                replaced = true;
+                return `${prefix}${testValue.toFixed(4)}${suffix}`;
+            }
+            return match;
+        });
+
+        if (!replaced && param.original.startsWith('-')) {
+            const positiveOriginal = param.original.slice(1);
+            const escapedPositive = positiveOriginal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            regex = new RegExp(`(^|=|[*+/\\-(])-${escapedPositive}([*+/\\-()]|[tu]|$)`, 'g');
+            testEq = testEq.replace(regex, (match, prefix, suffix) => {
+                console.log(`Fallback match for ${key}: fullMatch="${match}", prefix="${prefix}", suffix="${suffix}"`);
+                if (!replaced) {
+                    replaced = true;
+                    return `${prefix}${testValue.toFixed(4)}${suffix}`;
+                }
+                return match;
+            });
+        }
+
+        const originalPositions = getPlotPositions(originalEquation);
+        const testPositions = getPlotPositions(testEq);
+        const isOperative = originalPositions.length > 0 && testPositions.length > 0 && 
+                           !arraysEqual(originalPositions.slice(0, 100), testPositions.slice(0, 100), 0.001);
+
+        if (isOperative || testEq !== originalEquation) {
+            operativeParams[key] = param;
+            const container = document.createElement('div');
+            container.className = 'slider-container';
+
+            const label = document.createElement('label');
+            label.textContent = `${key} (${param.value.toFixed(2)})`;
+
+            const slider = document.createElement('input');
+            slider.type = 'range';
+            slider.id = `slider-${key}`;
+            slider.min = param.min;
+            slider.max = param.max;
+            slider.step = 0.0001; // Fine step for precision
+            slider.value = param.value;
+
+            // Update label and plot on slider input
+            slider.oninput = () => {
+                params[key].value = parseFloat(slider.value);
+                label.textContent = `${key} (${slider.value.slice(0, 5)})`;
+                isSliderUpdate = true;
+                updatePlotWithSliders();
+                isSliderUpdate = false;
+            };
+
+            // Custom key handling for faster tapping and repeating
+            let repeatInterval = null;
+            const stepSize = 0.01; // Adjust this for faster/slower increments
+            const repeatDelay = 50; // Initial delay before repeating (ms)
+            const repeatRate = 20; // Repeat interval (ms, faster than default)
+
+            slider.addEventListener('keydown', (e) => {
+                e.preventDefault(); // Stop default slow behavior
+                const currentValue = parseFloat(slider.value);
+                let newValue;
+
+                if (e.key === 'ArrowLeft') {
+                    newValue = Math.max(parseFloat(slider.min), currentValue - stepSize);
+                } else if (e.key === 'ArrowRight') {
+                    newValue = Math.min(parseFloat(slider.max), currentValue + stepSize);
+                } else {
+                    return; // Ignore other keys
+                }
+
+                slider.value = newValue;
+                params[key].value = newValue;
+                label.textContent = `${key} (${newValue.toFixed(5)})`;
+                isSliderUpdate = true;
+                updatePlotWithSliders();
+                isSliderUpdate = false;
+
+                // Start repeating if key is held
+                if (!repeatInterval) {
+                    repeatInterval = setTimeout(() => {
+                        repeatInterval = setInterval(() => {
+                            const currentValue = parseFloat(slider.value);
+                            let newValue = e.key === 'ArrowLeft' 
+                                ? Math.max(parseFloat(slider.min), currentValue - stepSize)
+                                : Math.min(parseFloat(slider.max), currentValue + stepSize);
+                            slider.value = newValue;
+                            params[key].value = newValue;
+                            label.textContent = `${key} (${newValue.toFixed(5)})`;
+                            isSliderUpdate = true;
+                            updatePlotWithSliders();
+                            isSliderUpdate = false;
+                        }, repeatRate);
+                    }, repeatDelay);
+                }
+            });
+
+            slider.addEventListener('keyup', () => {
+                // Stop repeating when key is released
+                if (repeatInterval) {
+                    clearInterval(repeatInterval);
+                    clearTimeout(repeatInterval);
+                    repeatInterval = null;
+                }
+            });
+
+            container.appendChild(label);
+            container.appendChild(slider);
+            slidersDiv.appendChild(container);
+            console.log(`Slider ${key} operative, included`);
+        } else {
+            console.log(`Slider ${key} not operative`);
+        }
+    });
+
+    console.log('Operative parameters:', operativeParams);
+    return operativeParams;
+}
+
+
+
+
+
+
+function updatePlotWithSliders() {
+    if (!originalEquation) return;
+    let equation = originalEquation; // Start with the original equation
+    console.log('Original equation:', originalEquation);
+
+    const replacements = {}; // Store all replacements
+
+    // Collect all slider values
+    for (const [key, param] of Object.entries(currentParams)) {
+        const slider = document.getElementById(`slider-${key}`);
+        if (slider) {
+            const newValue = parseFloat(slider.value);
+            replacements[key] = { original: param.original, value: newValue.toFixed(4) };
+            console.log(`Replacing ${param.original} with ${newValue.toFixed(4)} in ${key}`);
+        }
+    }
+
+    // Apply replacements to the original equation in one pass
+    for (const [key, { original, value }] of Object.entries(replacements)) {
+        const escapedOriginal = original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Match whole number with proper boundaries
+        const regex = new RegExp(`(^|[^0-9.])${escapedOriginal}(?=[^0-9.]|$)`, 'g');
+        equation = equation.replace(regex, (match, prefix) => {
+            return `${prefix || ''}${value}`;
+        });
+        console.log(`After replacing ${original} with ${value} in ${key}:`, equation);
+    }
+
+    try {
+        const parts = equation.split(',').map(s => s.trim());
+        parts.forEach(part => {
+            const expr = part.split('=')[1];
+            new Function('t', 'u', 'return ' + expr);
+        });
+        console.log('Updated equation:', equation);
+        display.value = equation;
+        plotFunctionV2();
+    } catch (e) {
+        console.error('Invalid equation syntax:', e.message);
+        display.value = `Error: Invalid syntax - ${e.message}`;
+        setTimeout(() => { display.value = originalEquation; }, 1500);
+    }
+}
+
+
+
+
+    function animate() {
+        if (isAnimating) {
+            requestAnimationFrame(animate);
+            controls.update();
+            composer.render();
+        }
+    }
+
+
+
+
+function updateEquationList() {
+    equationList.innerHTML = '';
+
+    // Define equation types and their detection logic
+    const equationGroups = {
+        'Parametric': [],
+        'Explicit y=f(x,z)': [],
+        'Explicit z=f(x,y)': [],
+        'Explicit x=f(y,z)': [],
+        'Explicit y=f(x)': [],
+        'Implicit': []
+    };
+
+    // Categorize equations
+    storedEquations.forEach((eq) => {
+        if (eq.includes('x(t)') || eq.includes('y(t)') || eq.includes('z(t)')) {
+            equationGroups['Parametric'].push(eq);
+        } else if (eq.includes('y=')) {
+            equationGroups['Explicit y=f(x,z)'].push(eq);
+        } else if (eq.includes('z=')) {
+            equationGroups['Explicit z=f(x,y)'].push(eq);
+        } else if (eq.includes('=') && eq.includes('y') && eq.includes('z') && !eq.includes('x')) {
+            equationGroups['Explicit x=f(y,z)'].push(eq);
+        } else if (eq.includes('x') && !eq.includes('y') && !eq.includes('z')) {
+            equationGroups['Explicit y=f(x)'].push(eq);
+        } else if (eq.includes('=') && !eq.includes('y=') && !eq.includes('z=')) {
+            equationGroups['Implicit'].push(eq);
+        }
+    });
+
+    // Render groups with collapsible headers
+    Object.entries(equationGroups).forEach(([type, equations]) => {
+        if (equations.length > 0) {
+            // Group container
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'equation-group';
+
+            // Header
+            const header = document.createElement('div');
+            header.className = 'group-header';
+            header.innerHTML = `<span class="toggle-icon">▼</span> ${type} (${equations.length})`;
+            header.style.cursor = 'pointer';
+            header.addEventListener('click', () => {
+                const content = groupDiv.querySelector('.group-content');
+                const icon = header.querySelector('.toggle-icon');
+                if (content.style.display === 'none') {
+                    content.style.display = 'block';
+                    icon.textContent = '▼';
+                } else {
+                    content.style.display = 'none';
+                    icon.textContent = '▶';
+                }
+            });
+
+            // Content container
+            const content = document.createElement('div');
+            content.className = 'group-content';
+     content.style.display = 'none';
+
+            // Add equations
+            equations.forEach((eq) => {
+                const div = document.createElement('div');
+                div.className = 'equation-item';
+                const span = document.createElement('span');
+                span.textContent = eq;
+                span.style.cursor = 'pointer';
+                span.onclick = () => {
+                    display.value = eq;
+                    plotFunctionV2();
+                };
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.onclick = () => {
+                    storedEquations.splice(storedEquations.indexOf(eq), 1);
+                    localStorage.setItem('storedEquations', JSON.stringify(storedEquations));
+                    updateEquationList();
+                };
+                div.appendChild(span);
+                div.appendChild(deleteBtn);
+                content.appendChild(div);
+            });
+
+            groupDiv.appendChild(header);
+            groupDiv.appendChild(content);
+            equationList.appendChild(groupDiv);
+        }
+    });
+}
+
+
+
+
+    function exportToPNG() {
+        const exportWidth = 4000;
+        const exportHeight = 4000;
+        const originalWidth = renderer.domElement.width;
+        const originalHeight = renderer.domElement.height;
+
+        renderer.setSize(exportWidth, exportHeight);
+        lineMaterial.resolution.set(exportWidth, exportHeight);
+        composer.setSize(exportWidth, exportHeight);
+        fxaaPass.uniforms['resolution'].value.set(1 / exportWidth, 1 / exportHeight);
+        composer.render();
+
+        const dataURL = renderer.domElement.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = dataURL;
+        link.download = 'plot_export.png';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        renderer.setSize(originalWidth, originalHeight);
+        lineMaterial.resolution.set(originalWidth, originalHeight);
+        composer.setSize(originalWidth, originalHeight);
+        fxaaPass.uniforms['resolution'].value.set(1 / originalWidth, 1 / originalHeight);
+        composer.render();
+    }
+
+
+
+
+function exportPlotToCSV() {
+    if (!plotPositions.length) {
+        console.log('No plot points to export');
+        return;
+    }
+
+    // Create CSV content with headers
+    let csvContent = "x,y,z\n";
+    for (let i = 0; i < plotPositions.length; i += 3) {
+        const x = plotPositions[i].toFixed(2);
+        const y = plotPositions[i + 1].toFixed(2);
+        const z = plotPositions[i + 2].toFixed(2);
+        csvContent += `${x},${y},${z}\n`;
+    }
+
+    // Create and trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'plot_points.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    console.log(`Exported ${plotPositions.length / 3} plot points to CSV`);
+}
+
+
+
+
+    document.querySelectorAll('#buttons button').forEach(button => {
+        if (button.id === 'clearBtn') button.addEventListener('click', clearDisplay);
+        else if (button.id === 'backspaceBtn') button.addEventListener('click', backspace);
+        else if (button.id === 'plotBtn') button.addEventListener('click', () => { isSliderUpdate = false; plotFunctionV2(); });
+        else if (button.id === 'equalsBtn') button.addEventListener('click', calculate);
+	else if (button.id === 'resetViewBtn') button.addEventListener('click', resetCameraView);
+        else if (button.dataset.value === 'range+') button.addEventListener('click', () => { range += 1; plotFunctionV2(); });
+        else if (button.dataset.value === 'range-') button.addEventListener('click', () => { range = Math.max(1, range - 1); plotFunctionV2(); });
+        else if (button.dataset.value === 'step+') button.addEventListener('click', () => { step = Math.min(1, step + 0.05); plotFunctionV2(); });
+        else if (button.dataset.value === 'step-') button.addEventListener('click', () => { step = Math.max(0.01, step - 0.05); plotFunctionV2(); });
+	else if (button.dataset.value === 'stepU+') button.addEventListener('click', () => { stepU = Math.min(1, stepU + 0.05); plotFunctionV2(); });
+    	else if (button.dataset.value === 'stepU-') button.addEventListener('click', () => { stepU = Math.max(0.01, stepU - 0.05); plotFunctionV2(); });
+	else if (button.id === 'saveBtn') button.addEventListener('click', saveEquation);
+	else if (button.id === 'traceBtn') button.addEventListener('click', enableTraceMode);
+	else if (button.id === 'exportCSVBtn') button.addEventListener('click', exportPlotToCSV);
+	else if (button.id === 'renderBtn') button.addEventListener('click', renderSurface);
+        else button.addEventListener('click', () => appendToDisplay(button.dataset.value));
+    });
+
+    document.getElementById('exportBtn').addEventListener('click', exportToPNG);
+
+document.addEventListener('keydown', (event) => {
+    if (!isTracing) return;
+    switch (event.key) {
+        case 'ArrowRight':
+        case 'ArrowUp':
+            traceNext();
+            event.preventDefault();
+            break;
+        case 'ArrowLeft':
+        case 'ArrowDown':
+            tracePrevious();
+            event.preventDefault();
+            break;
+    }
+});
+
+
+
+    initThreeJS();
+    updateEquationList();
+</script>
